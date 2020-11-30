@@ -123,13 +123,6 @@ TABS            .BYTE     TAB1           		;1st tab stop
 NUMTABS         =     3               		 	;Number of tab stops
 
 
-KEYS		.BYTE		ESC
-		.BYTE		':'			;
-		.BYTE     	0              		;End of table
-
-.KEYdef		.WORD		CMD_INTELHEX-1		
-		.WORD		CMD_ESC-1	
-
 ;------------------------------------------------------------------------
 ; Parse command or line number
 ; A holds the command character
