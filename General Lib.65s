@@ -24,7 +24,7 @@ STRING  		PHP				;print stringz to screen
         		LDY     #$01        		
 .NEXTCHAR 		LDA     (SRCE),Y        		
 			PHA
-			AND	#@01111111		;strip negative bit			
+			AND	#%01111111		;strip negative bit			
         		JSR     WRCHAR        		
         		PLA
         		BMI	.ADJUST_RETURN 		;if z=1 then end.
@@ -145,7 +145,7 @@ WRCHAR
 		
 			PHP				;save flags			
         		PHA        		
-.WAITTX  		LDA     #@00010000
+.WAITTX  		LDA     #%00010000
         		AND     ACIA+1        		
         		BEQ     .WAITTX        		
         		PLA        		
@@ -209,7 +209,7 @@ WRWORDAY       		JSR     WR2HEX          	;Print MSB
 
 SCAN_ESC    
 		.IF MYWYM		
-			LDA     #@00001000
+			LDA     #%00001000
 			AND     ACIA+1     		; ACIA Status register        	
 			BEQ	.NOTHING		; Anything in the buffer
 			JSR	READACIA	
@@ -231,7 +231,7 @@ SCAN_ESC
 RDCHAR
   		.IF MYWYM 
 			CLC                		;Read ASCII byte into AC
-.WAITRX  		LDA     #@00001000
+.WAITRX  		LDA     #%00001000
         		AND     ACIA+1     		;ACIA Status register        	
         		BEQ     .WAITRX        	
 READACIA       		LDA     ACIA        		
@@ -327,15 +327,15 @@ UPPERCASE 		LDA 	IN,x
 ; *** LCD initialisation
 ;------------------------------------------------------------------------
 LCD_LINIT		LDX 	#$04			;do function set 4 times
-.LINIT0			LDA 	#@00111000		;function set: 8 bit, 2 lines, 5x7
+.LINIT0			LDA 	#%00111000		;function set: 8 bit, 2 lines, 5x7
 			STA 	LCD0
 			JSR 	LCD_BUSY		;wait for busy flag to clear
 			DEX
 			BNE 	.LINIT0
-			LDA	#@00000110		;entry mode set: increment, no shift
+			LDA	#%00000110		;entry mode set: increment, no shift
 			STA 	LCD0
 			JSR 	LCD_BUSY
-			LDA 	#@00001110		;display on, cursor on, blink off
+			LDA 	#%00001110		;display on, cursor on, blink off
 			STA 	LCD0
 			JSR 	LCD_BUSY
 			LDA 	#$01			;clear display
@@ -352,21 +352,21 @@ LCD_LINIT		LDX 	#$04			;do function set 4 times
 		
 ;------------------------------------------------------------------------
 
-LCD_SCROLL		LDA	#@0000001
+LCD_SCROLL		LDA	#%0000001
 				
 
 
 ;------------------------------------------------------------------------
 ;LCD Clear screen
 ;------------------------------------------------------------------------
-LCD_CLR			LDA	#@00000001
+LCD_CLR			LDA	#%00000001
 			STA	LCD0 						
 			JSR	LCD_BUSY			
 			RTS			
 ;------------------------------------------------------------------------			
 ;LCD_home			
 ;------------------------------------------------------------------------
-LCD_HOME		LDA	#@00000011
+LCD_HOME		LDA	#%00000011
 			STA	LCD0 						
 			JSR	LCD_BUSY			
 			RTS		
@@ -377,7 +377,7 @@ LCD_HOME		LDA	#@00000011
 ;------------------------------------------------------------------------
 LCD_BUSY		PHA
 .LCD_BUSY0		LDA	LCD0			;read from LCD register 0
-			AND	#@10000000		;check bit 7 (busy)			
+			AND	#%10000000		;check bit 7 (busy)			
 			BNE	.LCD_BUSY0			
 			PLA			
 			RTS	
@@ -388,7 +388,7 @@ LCD_BUSY		PHA
 LCD_WRCHAR		STA 	LCD1
 			JSR 	LCD_BUSY			
 			LDA 	LCD0			;get current DDRAM address			
-			AND 	#@01111111		;everthing but busy flag			
+			AND 	#%01111111		;everthing but busy flag			
 			CMP 	#20			;wrap from pos $13 (line 1 char 20)...			
 			BNE 	.LCDPRINT0			
 			LDA 	#$C0			;...to $40 (line 2 char 1)			

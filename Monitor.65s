@@ -4,6 +4,8 @@
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
 ; "Programmed" by Joe DiMeglio
+
+			.opt proc65C02,swapbin
 		
 ;------------------------------------------------------------------------
 ; Compiler Options/Directives
@@ -599,7 +601,7 @@ PRINT_MSGS     		LDY	ERROR
 
 PRINT_SRCE     		LDA     (SRCE),Y       		;Get character (also GLobal Print)			
 			PHA	
-			AND	#@01111111			
+			AND	#%01111111			
                 	JSR     WRCHAR          	; and print it
                 	INY				;check if it exceed 127
                 	PLA                
@@ -711,10 +713,10 @@ INIT            	CLD                     	;You'll never know
                 	BEQ     .THATSIT
                 	LDA     (HIMEM),Y       	;See if this memory page exists
                 	TAX                     	;Save original value
-                	LDA     #@01010101     		;Try this value first
+                	LDA     #%01010101     		;Try this value first
                 	JSR     PROBE
                 	BNE     .THATSIT        	;End of RAM!
-                	LDA     #@10101010   		;Then try this value
+                	LDA     #%10101010   		;Then try this value
                 	JSR     PROBE
                 	BNE     .THATSIT        	;End of RAM!
                 	TXA                     	;Restore original value
@@ -879,7 +881,7 @@ GET_VAL         	STZ     NEG_FLAG        	;Clear negative flag
 	                BNE     .NASC           	;Nope!
 
         	        JSR     .GETASC         	;Get ASCII character
-	                AND     #@01111111     		;Make it positive
+	                AND     #%01111111     		;Make it positive
                 	BPL     .ASC_END        	;Always taken!
 
 ;------------------------------------------------------------------------
@@ -1726,9 +1728,9 @@ ADDLINE         	JSR     GET_VAL         	;Get line number
                 	LDA     DELIM           	;Was it space or dash?
 	                EOR     #' '            	;  (Makes A=0 if it is space                
 	                BEQ     .SPACE          	;It was space!
-	                LDA     #@01000000      	;Set dash flag
+	                LDA     #%01000000      	;Set dash flag
 .SPACE          	ORA     COUNT           	;Combine with counter
-			ORA	#@10000000		;Set PACK flag
+			ORA	#%10000000		;Set PACK flag
 	                BRA     .WRITE          	;Always taken!
 
 .EOL            	TYA                     	;Add 3 byte overhead to length
@@ -1943,7 +1945,7 @@ UNPACK          	LDY     #0              	;Get line length
 
 .UNPACK         	PHA                     	;Save packed type (space or -)
 	                STY     DELIM           	;Save source code pointer
-	                AND     #@00111111     		;Strip away type flag
+	                AND     #%00111111     		;Strip away type flag
 	                TAY                     	;	 to keep repeat counter
 	                PLA                     	;Find out what type it was
 	                ASL
@@ -2135,12 +2137,12 @@ DIRECT          	JSR     NEXT_IN         	;Get directive's name
 ; .BYTE and .AT directives
 ;------------------------------------------------------------------------
 
-DIR_AT          	LDY     #@10000000     		;Set end flag
+DIR_AT          	LDY     #%10000000     		;Set end flag
 DIR_AS          	STY     LEAD0          		;Save end flag
-                	LDY     #@01111111     		;In case of positive ASCII
+                	LDY     #%01111111     		;In case of positive ASCII
                 	CMP     #'-'           		;Is it the sign flag?
                 	BNE     .POS           		;No! Positive ASCII
-                	LDY     #@11111111     		;Set negative ASCII flag
+                	LDY     #%11111111     		;Set negative ASCII flag
                 	JSR     NEXT_IN         	;Point to next character
                 	BEQ     DIR_OPE         	;Premature EOL!
 .POS            	STY     CHAR            	;Save ASCII polarity
@@ -2413,7 +2415,7 @@ FIND_LOCAL      	LDA     GLOBAL          	;Start looking from the begin of
 	                LDA     (DEST),Y        	;Could it be this one?
 	                CMP     #$FF
 	                BEQ     .DONE           	;Nope! End of record
-	                AND     #@01111111      	;Ignore label declared flag !!!
+	                AND     #%01111111      	;Ignore label declared flag !!!
 	                CMP     LL_NUM
 	                BNE     .LOOP           	;It's not this one!
 	
@@ -2462,15 +2464,15 @@ FIND_GLOBAL     	LDA     SYM_TABLE       	;Start looking from the begin of
 	                CMP     #'Z'+1
 	                BCC     .MARK_END
 .FOUND_END      	STX     DELIM           	;Character must be restored later!
-                	;AND     #@01111111      	;Temporarily mark end of label = z=1
-                	ORA     #@10000000     		;Ignore declared flag
+                	;AND     #%01111111      	;Temporarily mark end of label = z=1
+                	ORA     #%10000000     		;Ignore declared flag
                 	STA     IN,X
 
 .FND_GLOBAL     	LDY     #0              	;Outer search loop
 	                LDA     (DEST),Y
 	                BEQ     .EXIT           	;End of symbol table reached!
-	                ;ORA     #@10000000     	;Ignore declared flag
-	                AND     #@01111111      	;Ignore declared flag
+	                ;ORA     #%10000000     	;Ignore declared flag
+	                AND     #%01111111      	;Ignore declared flag
 	                CMP     FIRST_CHAR      	;Should we bother looking further?
 	                BNE     .FAIL           	;Nope! Find next global label
 	
@@ -2497,14 +2499,14 @@ FIND_GLOBAL     	LDA     SYM_TABLE       	;Start looking from the begin of
 
 .EXIT           	LDX     DELIM           	;Label found or at end of symtab
                	 	LDA     IN,X            	;Restore end of label marker
-	                ;ORA     #@10000000		;only used for apple
-	                AND     #@01111111
+	                ;ORA     #%10000000		;only used for apple
+	                AND     #%01111111
 	                STA     IN,X
 	                LDY     #0
 	                LDA     (DEST),Y        	;A will be 0 if label not found
 	                BEQ     .RTS            	;Label not found!
-	                EOR     #@10000000      	;Save label's assigned flag
-	                ;AND     #@10000000      	;  (inverted!)
+	                EOR     #%10000000      	;Save label's assigned flag
+	                ;AND     #%10000000      	;  (inverted!)
 	                AND     PASS            	;Remains 0 if pass 1
 	                STA     LABEL_FLAG
 	                INY
@@ -2545,7 +2547,7 @@ ADD_LABEL       	JSR     FIND_LABEL      	;Find label in symbol table
 	                LDA     #6              	;Make room for 6 bytes in the
 	                JSR     EXP_SYM         	; symbol table
 	                LDA     FIRST_CHAR      	;Save first character of label
-; 		         AND     #@01111111     	; in symbol table (clear declared
+; 		         AND     #%01111111     	; in symbol table (clear declared
 	                STA     (DEST),Y        	;  flag first)
 	                INY
 	                LDA     PC              	;Place current PC into symbol
@@ -2585,7 +2587,7 @@ ADD_LABEL       	JSR     FIND_LABEL      	;Find label in symbol table
 	                BEQ     .EXT_DEF        	;Pass 1! Extra definition
 	
 	                LDA     (DEST),Y        	;Set declared flag in pass 2
-	                ORA     #@10000000
+	                ORA     #%10000000
 	                STA     (DEST),Y
 	
 	                LDA     FIRST_CHAR      	;What type was the label?
@@ -2862,10 +2864,10 @@ CMD_SHOWREG		CLD				;debugging
 RESET_VECTOR   		SEI				;Hardware reset routine
 
 		.IF	MYWYM
-        		LDA     #@01111111        		
+        		LDA     #%01111111        		
         		STA     IER        		
         		STA     IFR        		
-		       	LDA     #@00001111		;inputs and outputs
+		       	LDA     #%00001111		;inputs and outputs
 		       	STA     DIRB
 		.ENDIF
 		
@@ -2890,13 +2892,13 @@ RESET_RETURN 		LDX	#$ff       		;normal boot up procedure
         		CLD
         		
         	.IF	MYWYM
-        		LDA     #@00001111 		;show user that 6502 reseted        		
+        		LDA     #%00001111 		;show user that 6502 reseted        		
         		STA     REGB        		;Output LEDS
         		STZ     ACR        		
         		STZ     PCR	    		;pcr        	
-        		LDA     #@11001011 		
+        		LDA     #%11001011 		
         		STA     ACMND        		;19200 b/s 8 bits        				
-        		LDA     #@00011111        		
+        		LDA     #%00011111        		
         		STA     ACTRL        		
         		STZ     REGB			;clear lights
 		.ENDIF       		
@@ -2913,7 +2915,7 @@ RESET_RETURN 		LDX	#$ff       		;normal boot up procedure
 CMD_HLP 		JSR     STRING            	
 		.ASCII CR,"  _______  _______  _____    ______  __ ",CR,LF 		                         
 		.ASCII " |   |   ||    ___||     |  |   __ \|  |",CR,LF 		 	
-		.ASCII " |       ||    ___||     |_ |    __/|__|           @  User defined command",CR,LF                          
+		.ASCII " |       ||    ___||     |_ |    __/|__|           %  User defined command",CR,LF                          
 		.ASCII " |___|___||_______||_______||___|   |__|           A  Auto line numbering",CR,LF 
 		.ASCII "                                                   B  Break command",CR,LF                
 		.ASCII "   EXPANSION PORT LOW     EXPANSION PORT TOP       C  Copy command",CR,LF                      
