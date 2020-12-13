@@ -16,5 +16,8 @@ On the othe hand The KRUSADER by Ken Wessen had the supper effecient dissambler 
 
 I have to say i first wrote a monitor/OS back in 1992 on a 65C02 computer we built as part of my electronics engineering course. It had "everything" but an assembler. 
 Thought i'd add the ellusive assembler. In researching i learnt better ways to dissembler code - so not using all my code however ive perfer my interface. 
+
 Also the old DOS debug command is how i want the console to feel like. I already had that in my 1992 and im not setting backwards on this point - in otherwords, mistyping something means hitting the backspace not having to retyping the whole line again as many of these monitors have you do. 
+
+Compatible with 1.3.3
 
