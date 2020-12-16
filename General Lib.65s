@@ -1,5 +1,5 @@
 ; LIBRARY FILE
-; version 2.00
+; version 2.01
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
@@ -73,15 +73,32 @@ GOTOXY
 			STY	io_posy			
 			RTS		
 		.ENDIF			
+ 
+ ;------------------------------------------------------------------------
+; ANSI - CSI n x See https://en.wikipedia.org/wiki/ANSI_escape_code
+;  low level
+;------------------------------------------------------------------------
+WRCSI
+ 			PHA                		;save value
+        		LDA     #ESC        		
+        		JSR     WRCHAR        		
+        		LDA     #'['        		
+	        	JSR     WRCHAR	        	
+        		TXA        		
+        		JSR     WRDECI			;write in decimal 
+        		PLA        		
+        		JSR     WRCHAR        		;write ANSI Mode        			        		
+        		RTS    
         			
 ;------------------------------------------------------------------------
-; ANSI - Clear Screen
+; ANSI - Clear Screen; ;.BYTE 	ESC,"[2J",EOS		        		
 ;  low level
 ;------------------------------------------------------------------------
 CLS     		
 		.IF MYWYM
-			JSR     STRING             	
-			.BYTE 	ESC,"[2J",EOS		        		
+			LDX	#02
+			LDA	#'J'			;Clrscrn
+			JSR     WRCSI            	;				
         		RTS        	
 		.ELSE			
 			STA	io_cls			;use simlulator	
@@ -91,10 +108,24 @@ CLS
 ;------------------------------------------------------------------------
 ; ANSI -  Bring Cursor Home 
 ;------------------------------------------------------------------------
-HOME    		JSR     STRING        	
-        		.BYTE	ESC, "[1;1H",EOS          	        		
+HOME    		JSR     STRING        		
+        		.ASCIS	ESC, "[1;1H"         		        	        		
         		RTS       	        	
-        	
+        		
+;------------------------------------------------------------------------
+; ANSI -  Save Cursor Position
+;------------------------------------------------------------------------
+SAVECUR    		JSR     STRING 
+        		.ASCIS	ESC, "[s"          		        	        		
+        		RTS       	        	
+
+;------------------------------------------------------------------------
+; ANSI -  Restore Cursor Position 
+;------------------------------------------------------------------------
+RESTCUR    		JSR     STRING 
+        		.ASCIS	ESC, "[u"          		        	        		
+        		RTS      	        	
+        	        	        	
 ;------------------------------------------------------------------------
 ; Print a dot
 ;------------------------------------------------------------------------
@@ -104,14 +135,21 @@ WRDOT           	LDA     #'.'            	;Print a dot
 ;------------------------------------------------------------------------
 ; Check Tabs
 ;------------------------------------------------------------------------
-
-TABS3   		PHA
+TABS3
+   		.IF MYWYM
+			LDA	#'C'
+			LDX	#20
+			JSR	WRCSI
+			
+		.ELSE
+			PHA
 			LDA 	io_posx
 			LDA 	#20
 			;CLC
 			;ADC	#06
 			STA 	io_posx
 			PLA
+		.ENDIF	
 			RTS	
 		                
 ;------------------------------------------------------------------------

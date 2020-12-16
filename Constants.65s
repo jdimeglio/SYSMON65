@@ -1,5 +1,5 @@
 ; LIBRARY FILE
-; version 2.00
+; version 2.01
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
@@ -64,7 +64,7 @@ DEF_OBJLOW      =     	$0200           	;Default lowest object address
 ; PASS must remain the first label here! See INIT routine
 ;------------------------------------------------------------------------
 
-                *=     $0018          		;Leave 1st part of ZP free
+                .ORG    $0018          		;Leave 1st part of ZP free
 IN              .RS     128            		;Input and parse buffer 128 Characters input
 	
 	.IF LCD_ROUTINES
@@ -156,23 +156,6 @@ USRRS		.RS     2			;User RESET vector
 
 
 ;------------------------------------------------------------------------
-; Simulator or HARDWARE Mapping
-;------------------------------------------------------------------------
-
-io_area		= $8800				
-io_cls	 	= io_area + 0 			;writing to this clears the output window
-io_putc 	= io_area + 1 			;a "glass teletype" output window. BS, CR and LF are actioned
-io_putr 	= io_area + 2 			;raw output, bytes are output as their
-						;characters and not actioned.
-io_puth 	= io_area + 3 			;hex output, bytes are output as their hex code
-io_getc 	= io_area + 4 			;SCAN_ESCing character get, will wait for input
-io_posx 	= io_area + 5 			;set cursor x position by writing here
-io_posy 	= io_area + 6 			;set cursor y position by writing here        
-	
-KBD             = io_getc       		;Keyboard input register
-KBDCR           = io_getc 	        	;Keyboard control register
-
-;------------------------------------------------------------------------
 ; Hardware mapping
 ;------------------------------------------------------------------------
 	.IF LCD_ROUTINES
@@ -181,11 +164,25 @@ LCD0		=	$2000			;pretty low in memory map :-)
 LCD1		=	LCD0+1   	
 	.ENDIF
 
-	.IF MYWYM
 
+
+
+;------------------------------------------------------------------------
+; My board settings
+;------------------------------------------------------------------------	
+	.IF MYWYM
+	
+	.IF	SYMON
+	
+VIA     	= $8000				;My board settings
+ACIA    	= $8800	
+	.ELSE
 VIA     	= $4000				;My board settings
-ACIA    	= $6000		
-			
+ACIA    	= $6000				
+		
+	.ENDIF
+	
+		
 ADATA		= ACIA				;ACIA 6551 definations
 ASTAT		= ADATA +1
 ACMND		= ADATA +2
@@ -203,7 +200,25 @@ IER		= REGB +$E
 	.ELSE
 	
 
-VIA     =       $8000
-ACIA    =       io_area	
+;------------------------------------------------------------------------
+; Simulator or HARDWARE Mapping 6502 Simulator
+;------------------------------------------------------------------------
+VIA     	= $8000
+ACIA   	 	= io_area		
+io_cls	 	= io_area + 0 			;writing to this clears the output window
+io_putc 	= io_area + 1 			;a "glass teletype" output window. BS, CR and LF are actioned
+io_putr 	= io_area + 2 			;raw output, bytes are output as their
+						;characters and not actioned.
+io_puth 	= io_area + 3 			;hex output, bytes are output as their hex code
+io_getc 	= io_area + 4 			;SCAN_ESCing character get, will wait for input
+io_posx 	= io_area + 5 			;set cursor x position by writing here
+io_posy 	= io_area + 6 			;set cursor y position by writing here        
+	
+KBD             = io_getc       		;Keyboard input register
+KBDCR           = io_getc 	        	;Keyboard control register
+
 		
 	.ENDIF
+	
+	
+		

@@ -1,5 +1,5 @@
 ; MAIN FILE
-; version 2.00
+; version 2.01
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
@@ -13,12 +13,12 @@
 BRKAS2		= 0					;Add a second BRK byte
 MYWYM		= 0					;has MYWYM Board settings/Chips
 LCD_ROUTINES	= 0					;Compile with LCD 16x2 lines 	
-
+SYMON		= 0					;used for SYMON to define CIA and VIA
 	
 		.INCLUDE	"constants.65s"
 	
 	
- 			*=  $c000 			;ROM location
+ 			*= $E000 			;ROM location
  		
 ;------------------------------------------------------------------------
 ; Lets get going
@@ -249,8 +249,16 @@ DECODE_ONE 		PHY				;identical to ASCIIDUMP and MEM DUM s
 			LDA	(SRCE)			;Get OpCode
 			JSR 	INSTDSP			  		
 
-DISPLYASIC        	LDA	#45
+DISPLYASIC        	
+		.IF MYWYM
+			;LDX	#5
+			;LDA	#'C'			;move cursor forard	
+			JSR	WRSPACE
+		.ELSE				
+			LDA	#45
 			STA 	io_posx
+		.ENDIF	
+			
 			INC	LENG
 			LDA 	LENG
 			STA	COUNT			;add 1 to total length to include opcode				
@@ -2810,13 +2818,18 @@ TRACE_DIS		JSR 	CMD_SHOWREG		;show registers
 ; Show the registers
 ;------------------------------------------------------------------------------------------  
 CMD_SHOWREG		CLD				;debugging
+		.IF	MYWYM
+			JSR	SAVECUR 
+
+		.ELSE
 			LDY	io_posy			;GETY position
 			;INY	
 			CPY	#05
 			BPL	.reset
-			LDY	#05	
-			
-.reset			PHY	
+			LDY	#05
+			PHY	
+		.ENDIF	
+.reset				
 			LDX	#00			;top left
 			LDY	#00
 			JSR	GOTOXY	
@@ -2856,8 +2869,13 @@ CMD_SHOWREG		CLD				;debugging
         		LDA	SAVP
         		JSR	WRBIN			;Flags       	        	
         		JSR	DRAWLINE
+        		
+        	.IF 	MYWYM		 
+        		JSR	RESTCUR       		
+        	.ELSE        	
         		PLY
-        		STY	io_posy	        		
+        		STY	io_posy
+        	.ENDIF	
         		RTS        			;Start of code	
         	
 ;------------------------------------------------------------------------------------------
@@ -2900,7 +2918,7 @@ RESET_RETURN 		LDX	#$ff       		;normal boot up procedure
         		STA     ACMND        		;19200 b/s 8 bits        				
         		LDA     #%00011111        		
         		STA     ACTRL        		
-        		STZ     REGB			;clear lights
+        		STZ     REGB			;clear lights aka flash
 		.ENDIF       		
         	
         		CLI        		        		
@@ -2936,7 +2954,15 @@ CMD_HLP 		JSR     STRING
 		.ASCII "  |[]GND          D3[]|    VIA  $4000              W  Display Register",CR,LF                                              
 		.ASCIS "  +-------------------+    ACIA $6000",CR,LF
 			RTS
-			
+
+CMD_INIT
+			JSR	STRING
+		.ASCII "  _____ __ __    ___ ___ ____ ___ ___ "
+		.ASCII " |     |  |  |  |  _|  _|    |   |_  | LOWER limit: "
+		.ASCII " | | | |_   _|  | . |_  |  --| | |  _| UPPPER limit:"
+		.ASCII " |_|_|_| |_|    |___|___|____|___|___| Total RAM used:"
+		.ASCIS " GIOVANNI (C) COPYRIGHT 2020 v2.01 ",CR,LF			
+			RTS	
 			
 ;------------------------------------------------------------------------------------------
 ;interrupt vectors        

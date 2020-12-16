@@ -1,5 +1,5 @@
 ; LIBRARY FILE
-; version 2.00
+; version 2.01
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
@@ -119,7 +119,7 @@ CONTINUE 		JSR    	READ_DATA		;read rcord length with checksum add
         		JSR	WRCRLF        	
         		
         	.IF	MYWYM        						
-        		LDA     #@00001001		;set lights        		
+        		LDA     #%00001001		;set lights        		
         		STA	REGB
 		.ENDIF        		
         		CLI        		
@@ -128,7 +128,7 @@ CONTINUE 		JSR    	READ_DATA		;read rcord length with checksum add
         			
 TERMINATE  
 		.IF	MYWYM   
-			LDA   	#@00001111 		;LEDS arrange in the
+			LDA   	#%00001111 		;LEDS arrange in the
         		STA     REGB       		;mode means an error        		        		
 		.ENDIF        		
         		SEC        		
