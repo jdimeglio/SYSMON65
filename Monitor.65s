@@ -1,11 +1,14 @@
 ; MAIN FILE
-; version 2.01
+; version 2.04
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
 ; "Programmed" by Joe DiMeglio
+; https://github.com/jdimeglio/6502-Monitor
 
-			.opt proc65C02,swapbin
+			.OPT proc65C02,swapbin		;Michal Kowaski Simulator
+			.START	RESET_VECTOR		;version 1.3.2
+			.IO_WND 80,25			;
 		
 ;------------------------------------------------------------------------
 ; Compiler Options/Directives
@@ -18,7 +21,7 @@ SYMON		= 0					;used for SYMON to define CIA and VIA
 		.INCLUDE	"constants.65s"
 	
 	
- 			*= $E000 			;ROM location
+ 			*= $e000			;ROM location
  		
 ;------------------------------------------------------------------------
 ; Lets get going
@@ -39,14 +42,7 @@ GETLINE         	LDX	#$00			;reset buffer index
 			LDA     #PROMPT         	;Print the assembler prompt
                 	JSR     WRCHAR		
                 	JSR     AUTONUM         	;Generate line number if auto=on
-.IN             	
-		.IF MYWYM
-			JSR	RDCHAR
-			
-		.ELSE
-			LDA     KBDCR           	;Was a key pressed?
-                	BEQ     .IN             	;Nope! else have have the key     
-		.ENDIF	
+.IN             	JSR	RDCHAR			;Was a key pressed?
 .found	               	CMP     #ESC            	;Is it the ESC key?
                 	BEQ     .ESC         		;Nope!
 			CMP     #BS             	;Back space key then?
@@ -69,13 +65,19 @@ GETLINE         	LDX	#$00			;reset buffer index
                 	BRA     .CANCEL         	;Always taken! Too many chars.
 
 .ESC            	STZ     AUTO_FLAG       	;Clear auto flag and therefore OFF
-		.IF MYWYM
-			JSR     RDCHAR     		;get the unwanted arrow keys			
-        		JSR     RDCHAR        		
-        	.ENDIF
-.CANCEL         	LDA	#BELL			;play bell
-			JSR	WRCHAR
-			JSR     WRCRLF     		;Print CRLF
+		
+			
+;		.IF MYWYM
+;		.IF SYMON	
+;			JSR     RDCHAR     		;get the unwanted arrow keys	
+;			
+;		.ELSE			
+;			;JSR     RDCHAR        		        			
+;			;JSR     RDCHAR  
+;		.ENDIF			
+;		.ENDIF	
+		
+.CANCEL         	JSR     WRCRLF     		;Print CRLF
                 	BRA     GETLINE         	;Always taken! Restart line
 	
 .BS             	JSR     WRCHAR			;Process Back SPACE   
@@ -169,6 +171,9 @@ KEYDEF         		LDY     #0              	;Find command in table
                 	.BYTE     	'C'            	;Copy command
                 	.BYTE		'D'		;Dissassembler
                 	.BYTE     	'E'            	;Erase command
+  ;              	.BYTE		'F'		;Fill Command - future
+  			.BYTE		'G'		;GO command - future
+  ;			.BYTE		'H'		;Hunt Command - future
                 	.BYTE     	'?'            	;Help command
                 	.BYTE	  	'I'		;ASCII Dump	
                 	.BYTE     	'L'            	;List command
@@ -179,8 +184,7 @@ KEYDEF         		LDY     #0              	;Find command in table
                 	.BYTE     	'S'            	;Start assembling
                 	.BYTE		'T'		;Trace code
                 	.BYTE     	'V'            	;Value command
-                	.BYTE		"W"		;Display registers
-                	.BYTE     	'X'            	;eXecute command
+                	.BYTE		"W"		;Display registers                	
                 	.BYTE		'Y'		;memory configuraion
 			.BYTE		'Z'		;Clear Screen
                 	.BYTE		'@'		;User commands	
@@ -195,7 +199,9 @@ FUNCTIONS       	.WORD   CMD_AUT-1  		;Auto line numbering
 			.WORD	CMD_BRK-1		;Break command
                 	.WORD   CMD_COP-1      		;Copy command
                 	.WORD	CMD_DISSASSEMBLER-1	;Dissassembler
-                	.WORD   CMD_ERASE-1      		;Erase command                	
+                	.WORD   CMD_ERASE-1      	;Erase command                	
+;                	.WORD	CMD_FILL-1		;Fill memory
+			.WORD   CMD_XEC-1      		;eXecute command
                 	.WORD   CMD_HLP-1      		;Help command
                 	.WORD	CMD_ASCIIDUMP-1		;ASCII DUMP
                 	.WORD   CMD_LST-1      		;List command                
@@ -206,10 +212,9 @@ FUNCTIONS       	.WORD   CMD_AUT-1  		;Auto line numbering
                 	.WORD   CMD_ASM-1      		;Start assembling
                 	.WORD	CMD_TRACE-1		;Trace Code
                 	.WORD   CMD_VAL-1      		;Value command 
-                	.WORD	CMD_SHOWREG-1		;Display registers
-                	.WORD   CMD_XEC-1      		;eXecute command
+                	.WORD	CMD_SHOWREG-1		;Display registers                	
 			.WORD   CMD_MEM-1      		;Memory command	
-			.WORD   CMD_CLS-1      		;Memory command	
+			.WORD   CMD_CLS-1      		;Clrscreen command	
 			.WORD	CMD_USERKEYS-1		;Allows users to add more keys after @
 
 ;----------------------------------------------------------------------------------------
@@ -233,45 +238,7 @@ CMD_ESC            	STZ     AUTO_FLAG       	;Clear auto flag and therefore OFF
 ;Intel HEX loader
 		
 		.INCLUDE	"INTELHEX.65s"
-		
-;------------------------------------------------------------------------
-;DISSASSEMBLER
-;------------------------------------------------------------------------
 
-CMD_DISSASSEMBLER	JSR     GET_EXPRES         	;Get Source aka get expression 
-                	BNE	.CONT
-                	STY     SRCE			;else continue 
-                	STA     SRCE+1      	
-.CONT	        	LDY     #16
-
-DECODE_ONE 		PHY				;identical to ASCIIDUMP and MEM DUM s        		
-               		JSR	DISPLAY_ADDR        	;display SOURCE address (could remove A&Y)              		               		               		
-			LDA	(SRCE)			;Get OpCode
-			JSR 	INSTDSP			  		
-
-DISPLYASIC        	
-		.IF MYWYM
-			;LDX	#5
-			;LDA	#'C'			;move cursor forard	
-			JSR	WRSPACE
-		.ELSE				
-			LDA	#45
-			STA 	io_posx
-		.ENDIF	
-			
-			INC	LENG
-			LDA 	LENG
-			STA	COUNT			;add 1 to total length to include opcode				
-        		JSR	ASCII_DUMP		;display 
-        		LDA 	LENG  		
-			JSR	BUMPSRCE		;Added Length to Source
-.BUMPEX        		PLY
-			JSR     WRCRLF
-                	DEY
-                	BNE	DECODE_ONE 		;decode one line
-                	STZ	ERROR
-        		RTS
-        		
 ;------------------------------------------------------------------------	
 ;Bump Address by AC
 ;------------------------------------------------------------------------	
@@ -344,6 +311,8 @@ INSTDSP			TAY   				;Save op code
 			LDA 	CHAR2-1,X		;*  (If char from char2 is 0,
 			BEQ 	.PPADR3			;*   don't output it)
 			JSR 	WRCHAR
+			LDA 	UNDEF
+			JSR 	WRDECI	
 .PPADR3			DEX   
 			BNE 	.PPADR1
 			STX 	PRFLAG			;reset flag to 0
@@ -356,8 +325,7 @@ INSTDSP			TAY   				;Save op code
 			LDA 	(SRCE),Y		;Special print target adr
 			BCC 	.PPADR4			;*  (not displacement)
 .RELADR			JSR 	PCADJ3			;PCL,H + DISPL + 1 to A,Y
-			TAX   
-			;INX   
+			TAX   			   
 			BNE 	PRNTYX			;*     +1 to X,Y
 			INY   		
 PRNTYX			TYA   				;falls through
@@ -598,14 +566,13 @@ PRINT_MSGS     		LDY	ERROR
 			TAY				;index to message string
 			BRA	PRINT_SRCE
 		
-.ERRORMSGS		LDY	#<TEXT			;noramal texts		
-			STY	SRCE
-			LDY	#>TEXT 
-			STY	SRCE+1	
-			TAY				;Print Errors
+.ERRORMSGS		LDA	#<TEXT			;noramal texts		
+			STA	SRCE
+			LDA	#>TEXT 
+			STA	SRCE+1				
 			JSR     PRINT_SRCE      	;Print 3 characters                
 			LDY     #0              	;Save A
-                	STZ     ERROR           	;Clear the error now                                                    
+                	STY     ERROR           	;Clear the error now                                                    
 
 PRINT_SRCE     		LDA     (SRCE),Y       		;Get character (also GLobal Print)			
 			PHA	
@@ -620,7 +587,7 @@ PRINT_SRCE     		LDA     (SRCE),Y       		;Get character (also GLobal Print)
 ; Error Messages - TODO
 ;------------------------------------------------------------------------
 
-TEXT			.ASCIS    	" ERROR",CR,LF                 	                
+TEXT			.ASCII    	" ERROR",CR,LF + $80                	                
 PNTR_ERR_SYN		.ASCIS    	" :SYNTAX"        			;Syntax error
 PNTR_ERR_LBL 		.ASCIS    	" :LABEL"         			;Label error / no global 
 PNTR_ERR_RNG    	.ASCIS     	" :INVALID RANGE"          		;Range error
@@ -635,12 +602,8 @@ PNTR_ERR_EXT    	.ASCIS     	" :EXTRAT DEFINATION"          		;Extra definition 
 
 
 TEXT1        		.ASCIS     	"--------------------------"
-PNTR_WELCOME    	.ASCIS	  	"Giovanni OS V1.0"
-PNTR_AUTOTEXT		.ASCIS		"AUTONUM ENABLE startnig "
-PNTR_TOTALRAM		.ASCIS		"TOTAL RAM used: "
-PNTR_LOWERRAM		.ASCIS		"LOWER limit:    "	
-PNTR_UPPERRAM		.ASCIS		"UPPPER limit:   "
-PNTR_ERRORS     	.ASCIS     	" COMPILE ERROR(s)",CR,LF
+PNTR_AUTOTEXT		.ASCIS		"AUTONUM ENABLE starting "
+PNTR_ERRORS     	.ASCII     	" COMPILE ERROR(s)",CR,LF + $80
 PNTR_CANCEL     	.ASCIS     	"/"		
 PNTR_CODE_ORG  		.ASCIS     	".ORG ->"
 
@@ -659,12 +622,8 @@ ERR_MNE		=	PNTR_ERR_MNE - TEXT
 ERR_EXT		=	PNTR_ERR_EXT - TEXT	   
 
 ;standard messages
-STR_WWW         =     	TEXT1 - TEXT1 
-STR_WELCOME     =     	PNTR_WELCOME - TEXT1
+
 AUTOTEXT	=	PNTR_AUTOTEXT  - TEXT1
-TOTALRAM	=	PNTR_TOTALRAM  - TEXT1
-LOWERRAM	=	PNTR_LOWERRAM  - TEXT1
-UPPERRAM	=	PNTR_UPPERRAM  - TEXT1
 STR_ERRORS      =     	PNTR_ERRORS  - TEXT1	
 STR_CANCEL      =     	PNTR_CANCEL  - TEXT1
 CODE_ORG	=	PNTR_CODE_ORG  - TEXT1
@@ -689,33 +648,13 @@ NNONSPC         	LDA     IN,X            	;Is this a space?
 ; Initialise the assembler before we can start
 ;------------------------------------------------------------------------
 
-INITDATA		.WORD	$9000			;USR_OBJHI User's safe object end		
-			.BYTE	$00 			;Lomem address   | Don't
-			.BYTE	DEF_LOMEM		;LOMEM defined page
-			.BYTE	$00			;Himem address |  change order			
-			.BYTE	DEF_LOMEM		;HIMEM defined page
-			.WORD	XEC_RTS			;XEC_LAST Last Xec address				
-			.WORD	USERKEYDEF		;USERKEYDEF User defined @keys 
-			.WORD	IRQ_RETURN		;User IRQ vector
-			.WORD	BRK_RETURN		;User BRK vector	
-			.WORD	NMI_RETURN		;User NMI vector	
-			.WORD	RESET_RETURN		;User RESET vector
-		
+
 INIT            	CLD                     	;You'll never know
 		.IF LCD_ROUTINES		
 			STZ	WR2LCD			;Clear flag ie: write to Serial put		
 			JSR	LCD_LINIT
 		.ENDIF	
-                	LDA     #STR_WELCOME    	;Print welcome string
-                	JSR     PRINT_MSGS		
-			JSR	DRAWLINE		;Draw line
-	              
-                	LDX	#INIT-INITDATA		;FAST Initialise ZP (Check if portB pressed)	
-.INITZP         	LDA	INITDATA,X
-			STA	USR_OBJHI,X	
-			DEX
-                	BPL	.INITZP	               
-							;Memory scan
+                					;Memory scan
 .LOOP           	LDA     HIMEM+1         	;Stop if we run into our own code (himem +1)
                 	CMP     #>COLD			;/COLD
                 	BEQ     .THATSIT
@@ -1276,6 +1215,7 @@ _ERROR          	PLA                     	;Pull return address from stack
                 	PLA
                 	RTS
 
+
 ;------------------------------------------------------------------------
 ; Erase command - erase  line from editer
 ;------------------------------------------------------------------------
@@ -1286,6 +1226,9 @@ CMD_ERASE         	JSR     BEG_END         	;Get begin and end line parameters
 ERROR_MISSING   	LDA     #ERR_MIS        	;Exit with missing parameter
                 	STA     ERROR
 ERASE_RTS         	RTS
+      	
+                	
+                	
 
 ;------------------------------------------------------------------------
 ; Delete block of lines
@@ -1372,6 +1315,9 @@ BEG_END         	STY     DUMP            	;Disable dump mode
 .NOPARM         	CLC                     	;Indicate no parameters are given
                 	RTS                     	; (DEL requires them!)
 
+
+ 
+
 ;------------------------------------------------------------------------
 ; LIST command
 ;------------------------------------------------------------------------
@@ -1381,10 +1327,10 @@ CMD_LST         	JSR     BEG_END         	;Get begin and end line parameters
                 	JSR     FIND_LINE
 
 .LOOP           	JSR     SCAN_ESC            	;SCAN_ESC if key pressed
-	                BEQ     .RTS            	;ESC pressed!
+	                BEQ     DORTS            	;ESC pressed!
 	                LDY     #0              	;Check EOF
 	                LDA     (PNTR),Y
-	                BEQ     .RTS            	;Yes!
+	                BEQ     DORTS            	;Yes!
 	                INY                     	;See if we're past end line
 	                SEC
 	                LDA     (PNTR),Y
@@ -1397,7 +1343,7 @@ CMD_LST         	JSR     BEG_END         	;Get begin and end line parameters
 	                SBC     PARM2+1
 	                ORA     DELIM
 	                BEQ     .EQUAL          	;Hey, last line to list!
-	                BCS     .RTS            	;We're done!
+	                BCS     DORTS            	;We're done!
 
 .EQUAL          	LDA     DUMP            	;Dump mode?
                 	BNE     .SKIP           	;Yes! Skip line number printing
@@ -1414,7 +1360,7 @@ CMD_LST         	JSR     BEG_END         	;Get begin and end line parameters
 	                JSR	PRLF			;New line on screen	
 	                JSR     NEXT_LINE       	;Set pointer to next line
 	                BNE     .LOOP           	;Repeat if not EOF!
-.RTS            	RTS
+DORTS            	RTS
 
 ;------------------------------------------------------------------------
 ; MEMORY command
@@ -1429,7 +1375,7 @@ CMD_MEM         	BEQ     SHOWMEM         	;Yes! Set Lomem,Himem
 	                BEQ     .HIMEM          	;Nope!
 	
 	                JSR     GET_VAL         	;Get lomem value
-	                BNE     RTS_MEM         	;An error occurred!
+	                BNE     DORTS         		;An error occurred!
 	                STY     LOMEM           	;Copy new lomem value
 	                STA     LOMEM+1
 	
@@ -1439,34 +1385,46 @@ CMD_MEM         	BEQ     SHOWMEM         	;Yes! Set Lomem,Himem
 
 .HIMEM          	INX
 	                JSR     GET_VAL         	;Get himem value
-	                BNE     RTS_MEM         	;An error occurred!
+	                BNE     DORTS	         	;An error occurred!
 	                STY     HIMEM           	;Copy new himem value
 	                STA     HIMEM+1
 
 .DONE          		LDY     #0              	;Perform a new command
                 	STY     OLD_SAVE        	;However OLD will not work now
                 	JSR     DONEW           	;Clear source program
+ 
                 
-SHOWMEM         	LDA	#LOWERRAM		;SHOW Memory Values.
-			JSR	PRINT_MSGS		
+SHOWMEM         	JSR	STRING
+			.ASCII "  _____ __ __    ___ ___ ____ ___ ___ ",LF,CR
+			.ASCIS " |     |  |  |  |  _|  _|    |   |_  | LOWER limit: "				 			 
+ 
 			LDA     LOMEM+1         	;Print lomem
 	                LDY     LOMEM
-	                JSR     .PRWORDCR
-	               
-	               	LDA	#UPPERRAM
-			JSR	PRINT_MSGS                
+	                JSR     WRWORD	        	
+	        	JSR      STRING
+	        	.ASCII	LF,CR
+	               	.ASCIS " | | | |_   _|  | . |_  |  --| | |  _| UPPER limit: " 			
+			
 	                LDA     HIMEM+1         	;And himem
 	                LDY     HIMEM
-	                JSR     .PRWORDCR
-	
-	                LDA	#TOTALRAM		
-			JSR	PRINT_MSGS 		
+	                JSR     WRWORD
+	                
+	        
+	        	JSR	STRING
+	        	.ASCII	LF,CR
+			.ASCIS " |_|_|_| |_|    |___|___|____|___|___| TOTAL spent: "
+				
+ 	
 	                JSR     FIND_EOFZ       	;Find end of source file
 	                LDY     PNTR
 	                LDA     PNTR+1                
-                
-.PRWORDCR       	JSR     WRWORD 
-                	JMP     WRCRLF
+                	JSR     WRWORD
+			JSR	STRING
+			.ASCII	LF,CR 
+			.ASCII " GIOVANNI (C) COPYRIGHT 2020 v2.04 ",CR,LF + $80
+
+.PRWORDCR       	;JSR     WRWORD
+                	RTS
 
 
 ;------------------------------------------------------------------------
@@ -1644,9 +1602,50 @@ WRBIN          		STA     CHAR			;
                 	BNE     .BITLOOP        	;Do all 4 bits
 VAL_RTS         	RTS
 VAL_UNDEF       	JMP     UNDEF_ERROR     	;Exit with undefined label used
-
+		
 ;------------------------------------------------------------------------
-; XEC command
+;DISSASSEMBLER
+;------------------------------------------------------------------------
+
+CMD_DISSASSEMBLER	STZ	UNDEF
+			JSR     GET_EXPRES         	;Get Source aka get expression 
+                	BNE	.CONT
+                	LDY     UNDEF           	;Undefined label used?
+	                BNE     VAL_UNDEF       	;Yes!
+                	STY     SRCE			;else continue 
+                	STA     SRCE+1      	                	
+                	
+.CONT			LDY     #16
+DECODE_ONE 		PHY				;identical to ASCIIDUMP and MEM DUM s        		
+               		JSR	DISPLAY_ADDR        	;display SOURCE address (could remove A&Y)              		               		               		
+			LDA	(SRCE)			;Get OpCode
+			JSR 	INSTDSP			  		
+
+DISPLYASIC        	
+		.IF MYWYM
+			;LDX	#5
+			;LDA	#'C'			;move cursor forard	
+			JSR	WRSPACE
+		.ELSE				
+			LDA	#45
+			STA 	io_posx
+		.ENDIF	
+			
+			INC	LENG
+			LDA 	LENG
+			STA	COUNT			;add 1 to total length to include opcode				
+        		JSR	ASCII_DUMP		;display 
+        		LDA 	LENG  		
+			JSR	BUMPSRCE		;Added Length to Source
+.BUMPEX        		PLY
+			JSR     WRCRLF
+                	DEY
+                	BNE	DECODE_ONE 		;decode one line
+                	STZ	ERROR
+        		RTS
+        		
+;------------------------------------------------------------------------
+; Go command or Excute code command
 ;------------------------------------------------------------------------
 
 CMD_XEC         	BEQ     .RUN            	;Nope! Run from last known addr.
@@ -2010,11 +2009,11 @@ CMD_ASM         	JSR 	DRAWLINE
 
 ASSEMBLE        	JSR     SET_BOF         	;Start at begin of program
 		        STZ     GLOBAL+1        	;Make last global label invalid        
-	                LDA     DEF_ORG        		;Setup default PC
+	                LDA     #<DEF_ORG        		;Setup default PC
 	                STA     PC
 	                STA     TA
 	                STA     TA_BEGIN
-	                LDA     DEF_ORG+1
+	                LDA     #>DEF_ORG
 	                STA     PC+1
 	                STA     TA+1
 	                STA     TA_BEGIN+1
@@ -2299,6 +2298,8 @@ FATAL_ERROR2    	JSR     CHCK_ERROR      	;Print the error
                 	JMP     GETLINE         	;And abort assembly! Fatal EERROR
 DIR_OPE2        	JMP     DIR_OPE         	;Operand EERROR
 
+
+
 ;------------------------------------------------------------------------
 ; Save byte to target
 ;------------------------------------------------------------------------
@@ -2384,14 +2385,20 @@ FIND_LABEL      	LDA     SYM_TABLE+1     	;Is symbol table valid?
                 	BCS     NO_LABEL        	;It's not!
 	
         	        JMP     FIND_GLOBAL     	;Find global label
+;        	       	BEQ	.CHECK_ROM_GLOBAL	;didnt find 
+;        	       	RTS
+        	        
+;.CHECK_ROM_GLOBAL      	LDX     SAVE_Y 
+;			JMP 	FIND_GLOBAL_ROM	        ;check ROM libray        
+;			BNE	.RTS		
 	
 .NOSYM          	CLC                     	;Indicate label given
-                	JSR     UNDEF_ERROR     	;Exit with undefined labelEERRORr
+                	JSR     UNDEF_ERROR     	;Exit with undefined label ERROR
                 	LDA     #0              	;Make Z=0 meaning label not found
-                	RTS
+.RTS                	RTS
 
 NO_LABEL        	SEC                    	 	;Indicate no label given
-                	RTS
+	               	RTS
 
 ;------------------------------------------------------------------------
 ; Find a local label in the symbol table
@@ -2448,6 +2455,93 @@ FIND_LOCAL      	LDA     GLOBAL          	;Start looking from the begin of
 	                CMP     #$FF            	;Z=1 if label not found
 	                CLC                     	;There was no EERROR in label name
 	                RTS
+;------------------------------------------------------------------------
+; Find a global label in the symbol table
+; Record is: {first letter + $80, Address lo, hi, ptr string lo, hi, $ff} 
+;------------------------------------------------------------------------
+;FIND_GLOBAL_ROM     	LDA     #<SYM_TABLE_ROM       	;Start looking from the begin of
+;	                STA     DEST            	; the symbol table
+;	                LDA     #>SYM_TABLE_ROM
+;	                STA     DEST+1
+;	                BRA	FIND_GLOBAL_SRCH
+
+
+;.FND_GLOBAL     	STX     SAVE_Y 
+;			JSR	SEEK_END
+;
+;			LDY     #0              	;Outer search loop
+;	                LDA     (DEST),Y
+;	                BEQ     .EXIT           	;End of symbol table reached!	                
+;	                AND     #%01111111      	;Ignore declared flag
+;	                CMP     FIRST_CHAR      	;Should we bother looking further?
+;	                BNE     .FAIL           	;Nope! Find next global label
+;	
+;	                LDX     SAVE_Y          	;Point to begin of label again
+;	                ;LDY     #01              	;Get pointer to label's name
+;	                LDA     DEST+1        		; in source file
+;	                STA     SRCE+1          	;(Going backwards leaves Y=3)	                
+;	                LDA     DEST
+;	                STA     SRCE
+;	                JSR	CMP_STRING 
+ ;               
+;			BMI	EXIT_FIND_GLOBAL               
+;.FAIL			JSR	FIND_NEXT
+;			BCC     .FND_GLOBAL     	;No carry needed!
+;	                INC     DEST+1
+;	                BRA     .FND_GLOBAL     	;Always taken!	                
+
+;------------------------------------------------------------------------
+; Find a End of record 
+; Record is: {first letter + $80, Address lo, hi, ptr string lo, hi, $ff} 
+;------------------------------------------------------------------------
+
+;SEEK_END       		STX     SAVE_Y 			;Save start of label name
+;			INX                     	;Find end of label we're looking
+;	                LDA     IN,X            	; for
+;	                CMP     #'.'
+;	                BEQ     .SEEK_END       	;Not end yet!
+;	                CMP     #'0'
+;	                BCC     .FOUND_END      	;End!
+;	                CMP     #'9'+1
+;	                BCC     .SEEK_END
+;	                CMP     #'A'
+;	                BCC     .FOUND_END      	;End!
+;	                CMP     #'Z'+1
+;	                BCC     .SEEK_END
+;.FOUND_END              STX     DELIM           	;Character must be restored later!
+;			RTS
+
+;------------------------------------------------------------------------
+; Find a End of record 
+; Record is: {first letter + $80, Address lo, hi, ptr string lo, hi, $ff} 
+;------------------------------------------------------------------------
+
+;FIND_NEXT		LDY     #5              	;Find next label
+;.NXT_GLOBAL    		LDA     (DEST),Y        	;Try to find $FF which signals
+;	                INY                     	; the end of this label
+;	                CMP     #$FF
+;	                BNE     .NXT_GLOBAL     	;Not yet!
+;	                TYA                     	;Add current offset to DEST
+;	                CLC
+;	                ADC     DEST
+;	                STA     DEST
+;	                RTS
+		
+;------------------------------------------------------------------------
+; Find a global label in the symbol table
+; Record is: {first letter + $80, Address lo, hi, ptr string lo, hi, $ff} 
+;------------------------------------------------------------------------
+
+;CMP_STRING     		LDA     IN,X            	;Compare strings
+;	                BMI     .EOL            	;End of label reached! 
+;	                CMP     (SRCE),Y        	;Do they still match?
+;	                BNE     .EOL	           	;Nope!
+;	                INX
+;	                INY
+;	                BNE     .CMP_GLOBAL     	;Keep trying! Always taken until 00
+;.FAIL			SEC	                
+;.EOL			RTS
+			
 
 ;------------------------------------------------------------------------
 ; Find a global label in the symbol table
@@ -2458,7 +2552,7 @@ FIND_GLOBAL     	LDA     SYM_TABLE       	;Start looking from the begin of
 	                LDA     SYM_TABLE+1
 	                STA     DEST+1
 
-                	STX     SAVE_Y          	;Save start of label name
+FIND_GLOBAL_SRCH       	STX     SAVE_Y          	;Save start of label name
 .MARK_END       	INX                     	;Find end of label we're looking
 	                LDA     IN,X            	; for
 	                CMP     #'.'
@@ -2539,8 +2633,70 @@ FIND_GLOBAL     	LDA     SYM_TABLE       	;Start looking from the begin of
 	                STA     DEST
 	                BCC     .FND_GLOBAL     	;No carry needed!
 	                INC     DEST+1
-	                BRA     .FND_GLOBAL     	;Always taken!
+	                BRA     .FND_GLOBAL     	;Always taken!		
+;------------------------------------------------------------------------
+; Find a global label in the symbol table
+; Record is: {first letter + $80, Address lo, hi, ptr string lo, hi, $ff} 
+;------------------------------------------------------------------------
 
+;NEWFIND_GLOBAL     	LDA     SYM_TABLE       	;Start looking from the begin of
+;	                STA     DEST            	; the symbol table
+;	                LDA     SYM_TABLE+1
+;	                STA     DEST+1
+;
+;               	JSR	SEEK_END		;find end of label     	
+;	              	ORA     #%10000000     		;Ignore declared flag
+;                	STA     IN,X			; mark the
+;
+;.FND_GLOBAL     	LDY     #0              	;Outer search loop
+;	                LDA     (DEST),Y
+;	                BEQ     .EXIT           	;End of symbol table reached!	                
+;	                AND     #%01111111      	;Ignore declared flag
+;	                CMP     FIRST_CHAR      	;Should we bother looking further?
+;	                BNE     .FAIL           	;Nope! Find next global label
+;	
+;	                LDX     SAVE_Y          	;Point to begin of label again
+;	                LDY     #4              	;Get pointer to label's name
+;	                LDA     (DEST),Y        	; in source file
+;	                STA     SRCE+1          	;(Going backwards leaves Y=3)
+;	                DEY
+;	                LDA     (DEST),Y
+;	                STA     SRCE
+;
+;			JSR	CMP_STRING 
+;			BPL	.FAIL
+;			
+;.EOL            	LDA     (SRCE),Y        	;Is label in source also at end?
+;                	BMI     .EXIT          	 	;Yes! (packed space or LineLeng)
+;               	CMP     #':'
+;                	BNE     .FAIL           	;Nope!
+;
+;EXIT_FIND_GLOBAL      	LDX     DELIM           	;Label found or at end of symtab
+;               	 	LDA     IN,X            	;Restore end of label marker	                
+;	                AND     #%01111111
+;	                STA     IN,X
+;	                LDY     #0
+;	                LDA     (DEST),Y        	;A will be 0 if label not found
+;	                BEQ     .RTS     		;Label not found!
+;	                EOR     #%10000000      	;Save label's assigned flag	                
+;	                AND     PASS            	;Remains 0 if pass 1
+;	                STA     LABEL_FLAG
+;	                INY
+;	                LDA     (DEST),Y        	;Save label's value
+;	                STA     HEXVAL
+;	                INY
+;	                LDA     (DEST),Y
+;	                STA     HEXVAL+1
+;	                LDY     #0              	;Restore pointer
+;	                LDA     FIRST_CHAR      	; and first char (Z=0)
+;.RTS            	CLC                     	;There was no ERROR in label name
+;	                RTS
+;	
+;.FAIL          	 	JSR	FIND_NEXT
+;	                BCC     .FND_GLOBAL     	;No carry needed!
+;	                INC     DEST+1
+;	                BRA     .FND_GLOBAL     	;Always taken!
+;
 ;------------------------------------------------------------------------
 ; Add label
 ;------------------------------------------------------------------------
@@ -2826,10 +2982,9 @@ CMD_SHOWREG		CLD				;debugging
 			;INY	
 			CPY	#05
 			BPL	.reset
-			LDY	#05
-			PHY	
-		.ENDIF	
-.reset				
+			LDY	#05				
+.reset			PHY			
+		.ENDIF		
 			LDX	#00			;top left
 			LDY	#00
 			JSR	GOTOXY	
@@ -2849,7 +3004,8 @@ CMD_SHOWREG		CLD				;debugging
 		
 			        		
         		JSR	STRING
-		.ASCIS CR,LF,"  | | |    -|     |   --|   __|  XR="
+		.ASCII CR,LF
+		.ASCIS "  | | |    -|     |   --|   __|  XR="
         		
         		LDA	SAVX 
         		JSR     WR2HEX     		;X Reg        		
@@ -2873,7 +3029,7 @@ CMD_SHOWREG		CLD				;debugging
         	.IF 	MYWYM		 
         		JSR	RESTCUR       		
         	.ELSE        	
-        		PLY
+        		PLY				;restore Y
         		STY	io_posy
         	.ENDIF	
         		RTS        			;Start of code	
@@ -2882,21 +3038,24 @@ CMD_SHOWREG		CLD				;debugging
 RESET_VECTOR   		SEI				;Hardware reset routine
 
 		.IF	MYWYM
-        		LDA     #%01111111        		
+		
+			LDA     #%01111111        	;IRQ's Off		
         		STA     IER        		
         		STA     IFR        		
 		       	LDA     #%00001111		;inputs and outputs
 		       	STA     DIRB
+		       	LDA     #%00001111 		;show user that 6502 reseted        		
+        		STA     REGB        		;Output LEDS light ON
 		.ENDIF
 		
- ;       	lda     #b00010000		;heck if portB button ON for custom RESET
+;       	lda     #b00010000		;heck if portB button ON for custom RESET
 ;        	bit     VIA
 ;        	beq     NORMALRESET		;ignore this instructions
 ;        	jmp     (USRRST)
 
 RESET_RETURN 		LDX	#$ff       		;normal boot up procedure
-
         		TXS
+
 ;			SED
 ;			SEC
 ;			LDA 	#$20
@@ -2910,20 +3069,39 @@ RESET_RETURN 		LDX	#$ff       		;normal boot up procedure
         		CLD
         		
         	.IF	MYWYM
-        		LDA     #%00001111 		;show user that 6502 reseted        		
-        		STA     REGB        		;Output LEDS
+        		
         		STZ     ACR        		
-        		STZ     PCR	    		;pcr        	
-        		LDA     #%11001011 		
-        		STA     ACMND        		;19200 b/s 8 bits        				
-        		LDA     #%00011111        		
-        		STA     ACTRL        		
+        		STZ     PCR	    		;pcr   
+			LDA     #%11001011		;irq=off,dtr 		
+        		STA     ACMND        		
+        		LDA     #%00011111		;19,200 b/s 8 bits
+        		STA     ACTRL        		        		
         		STZ     REGB			;clear lights aka flash
+        		LDA	ADATA			;Clear ACIA
 		.ENDIF       		
-        	
-        		CLI        		        		
+		
+;FAST Initialise ZP (Check if portB pressed
+             
+                	LDX	#INITDATA_END-INITDATA		
+.INITZP         	LDA	INITDATA,X
+			STA	USR_OBJHI,X	
+			DEX
+                	BPL	.INITZP	               			
+			CLI				;restore Interrupts
         		JMP	COLD       	
 	
+
+INITDATA		.WORD	$9000			;USR_OBJHI User's safe object end		
+			.BYTE	$00 			;Lomem address   | Don't
+			.BYTE	DEF_LOMEM		;LOMEM defined page
+			.BYTE	$00			;Himem address |  change order			
+			.BYTE	DEF_LOMEM		;HIMEM defined page
+			.WORD	XEC_RTS			;XEC_LAST Last Xec address				
+			.WORD	USERKEYDEF_RETURN	;USERKEYDEF User defined @keys 
+			.WORD	IRQ_RETURN		;User IRQ vector
+			.WORD	BRK_RETURN		;User BRK vector	
+			.WORD	NMI_RETURN		;User NMI vector	
+INITDATA_END		.WORD	RESET_RETURN		;User RESET vector
 
 	
 
@@ -2933,7 +3111,7 @@ RESET_RETURN 		LDX	#$ff       		;normal boot up procedure
 CMD_HLP 		JSR     STRING            	
 		.ASCII CR,"  _______  _______  _____    ______  __ ",CR,LF 		                         
 		.ASCII " |   |   ||    ___||     |  |   __ \|  |",CR,LF 		 	
-		.ASCII " |       ||    ___||     |_ |    __/|__|           %  User defined command",CR,LF                          
+		.ASCII " |       ||    ___||     |_ |    __/|__|           @  User defined command",CR,LF                          
 		.ASCII " |___|___||_______||_______||___|   |__|           A  Auto line numbering",CR,LF 
 		.ASCII "                                                   B  Break command",CR,LF                
 		.ASCII "   EXPANSION PORT LOW     EXPANSION PORT TOP       C  Copy command",CR,LF                      
@@ -2947,23 +3125,33 @@ CMD_HLP 		JSR     STRING
 		.ASCII "  |[]A3          GND[]|  |[]PA6         PB6[]|     S  Start assembling",CR,LF                   
 		.ASCII "  |[]A2          A10[]|  |[]PA7         PB7[]|     T  Trace code",CR,LF                       
 		.ASCII "  |[]A1           CS[]|  +-------------------+     V  Value command",CR,LF                  
-		.ASCII "  |[]A0           D7[]|                            X  eXecute command",CR,LF                    
+		.ASCII "  |[]A0           D7[]|                            G  Go command",CR,LF                    
 		.ASCII "  |[]D0           D6[]|   HARDWARE MAPPING         Y  Memory configuraion",CR,LF 
 		.ASCII "  |[]D1           D5[]|                            E  Erase line",CR,LF                    
 		.ASCII "  |[]D2           D4[]|    CS   $2000              Z  Clear Screen",CR,LF                                                                                       
 		.ASCII "  |[]GND          D3[]|    VIA  $4000              W  Display Register",CR,LF                                              
-		.ASCIS "  +-------------------+    ACIA $6000",CR,LF
-			RTS
+		.ASCII "  +-------------------+    ACIA $6000",CR,LF + $80
+USERKEYDEF_RETURN	RTS
 
-CMD_INIT
-			JSR	STRING
-		.ASCII "  _____ __ __    ___ ___ ____ ___ ___ "
-		.ASCII " |     |  |  |  |  _|  _|    |   |_  | LOWER limit: "
-		.ASCII " | | | |_   _|  | . |_  |  --| | |  _| UPPPER limit:"
-		.ASCII " |_|_|_| |_|    |___|___|____|___|___| Total RAM used:"
-		.ASCIS " GIOVANNI (C) COPYRIGHT 2020 v2.01 ",CR,LF			
-			RTS	
-			
+;------------------------------------------------------------------------------------------
+; Routines library for dissembler ROMs
+;
+		
+;RNT_RDCHAR	.BYTE	$71,00,06
+;		.ASCII	"RDCHAR", $8D
+;RNT_WDCHAR	.ASCIS	"WRCHAR"
+		
+		
+;SYM_TABLE_ROM	.ASCIS	"R"
+;		.BYTE	<RDCHAR
+;		.BYTE	>RDCHAR
+;		.BYTE	<RNT_RDCHAR 			
+;		.BYTE	>RNT_RDCHAR
+;		.BYTE	$FF
+;		.BYTE	EOS
+
+
+		
 ;------------------------------------------------------------------------------------------
 ;interrupt vectors        
 ;------------------------------------------------------------------------------------------

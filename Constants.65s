@@ -21,9 +21,9 @@ PLUS		='+'				;Plus in simple expressions
 MINUS		='-'				;Minus in simple expressions
 DOT		='.'				;Indicates a local label
 QUOTE		='''				;delimits a string
-COMMA		=','
+COMMA		=','				
 CMNT		=';'				;indicates a full line comment
-PROMPT		='.'            		;The assembler prompt character
+PROMPT		='.'				;The assembler prompt character
 DASH		='-'				;Dash for crued graphics
 EOL		=$00				;End of line marker
 EOS		=$00				;End of string marker
@@ -31,17 +31,17 @@ EOFLD		=$01				;End of field in tokenised source line
 BLANK		=$02				;used to mark a blank line
 PRGEND		=$FE				;used to flag end of program parsing
 FAIL		=$FF				;used to flag failure in various searches
-CR		=$0D            		;CR character
-ESC		=$1B            		;ESC character
-BELL		=$20				;BELL should be $07 but $20 for testing 
-BS		=$08            		;Back space key
-TAB		=$09            		;TAB character
+CR		=$0D				;CR character
+ESC		=$1B				;ESC character
+BELL		=$07				;BELL should be $07 but $20 for testing 
+BS		=$08				;Back space key
+TAB		=$09				;TAB character
 LF		=$0a				;Line feed
 SP		=$20				;Space
 
-TAB1            =8              		;1st tab stop
-TAB2            =12             		;2nd tab stop
-TAB3            =21             		;3rd tab stop
+TAB1            =8 				;1st tab stop
+TAB2            =12				;2nd tab stop
+TAB3            =21				;3rd tab stop
 
 
 
@@ -126,13 +126,13 @@ DEC_SAVE        .RS     2               	;Decimal convert save value
 SAVE_Y          .RS     1               	;Save Y pointer
 LENG            .RS     2               	;Length of block move
 SRCE            .RS     2               	;Source for block move
-DEST            .RS     2               	;Destination for block move
+DEST            .RS     2			;Destination for block move
 
 ;------------------------------------------------------------------------
 ; for disassembler
 
 PRFLAG		.RS	2
-TEMP1		.RS	1			; general purpose storage
+TEMP1		.RS	1			;general purpose storage
 TEMP2		.RS	1
 
 ;------------------------------------------------------------------------
@@ -144,10 +144,10 @@ AUTO_INC        .RS     1               	;Auto increment
 AUTO_FLAG       .RS     1               	;Auto mode flag (if <> -)
 SYM_TABLE       .RS     2               	;Symbol table (if MSB <> 0)
 USR_OBJLO       .RS     2               	;User's safe object begin
-USR_OBJHI       .RS     2               	;User's safe object end	
-LOMEM           .RS     2               	;Lomem address   | Don't
-HIMEM        	.RS     2               	;Himem address |  change order
-XEC_LAST        .RS     2               	;Last Xec address
+USR_OBJHI       .RS     2			;User's safe object end	
+LOMEM           .RS     2			;Lomem address   | Don't
+HIMEM        	.RS     2			;Himem address |  change order
+XEC_LAST        .RS     2			;Last Xec address
 USERKEYDEF	.RS	2			;User defined @keys 
 USIRQ		.RS     2			;User IRQ vector
 USBRK		.RS     2			;User BRK vector

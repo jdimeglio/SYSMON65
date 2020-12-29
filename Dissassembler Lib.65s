@@ -432,18 +432,21 @@ ADDMOD							;Check the arguments and work out the
 			BEQ 	.NOTREL					
 			BRA 	DOREL			;Do relative Addressing
 	
-.DOIMM			CPY 	#$2C			;check exception first - STA
+.DOIMM			TYA
+			LDY 	#IMM
+			CMP 	#$2C			;check exception first - STA
 			BEQ 	BAD			
-			CPY 	#$35			;check inclusion - STX
+			CMP 	#$35			;check inclusion - LDX
 			BEQ 	.IMMOK
-			CPY 	#$22			;check inclusion - BIT
+			CMP 	#$22			;check inclusion - BIT
 			BEQ 	.IMMOK
-			LDY 	#IMM		
+					
 			JSR 	CHKMOD			;check command is ok with this mode
 			CPY 	#FAIL
 			BEQ 	.RET
 		
-.IMMOK			LDX	SAVE_Y
+.IMMOK			STY	CURADM			;
+			LDX	SAVE_Y
 			INX				;Get next Charater 
 			JSR	GET_EXPRES
 			RTS

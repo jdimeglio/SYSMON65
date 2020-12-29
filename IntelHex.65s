@@ -36,15 +36,15 @@ NEXTRECORD 		JSR 	RDCHAR
         		
 PROTOCOLERROR 		JSR 	WRCHAR
         		JSR     STRING        		
-        		.ASCIS    BELL,CR,LF," :PROTOCOL ERROR",CR,LF
+        		.ASCII    BELL,CR,LF," :PROTOCOL ERROR",CR,LF + $80
         		JMP     TERMINATE        		
 
 CONTINUE 		JSR    	READ_DATA		;read rcord length with checksum add
         		STA     COUNT			;load the amount of bytes to load into memory        		
         		JSR     READ_DATA		;read hgh byte of memory location         		       		
-        		STA     SRCE+1			;store hgh byte of memory location        		
+        		STA     SRCE+1			;store hgh byte of memory location        		        		
         		JSR     READ_DATA		;read low byte with checksum add			        		
-        		STA     SRCE			;store			        		
+        		STA     SRCE			;store			        		        		
         		JSR     READ_DATA		;get record type 01 = end        		
         		;CMP     #$00			;check if 00 if yes then type #00        		
         		BEQ     .DATARECORD		;get the data frame        		        		
@@ -53,7 +53,7 @@ CONTINUE 		JSR    	READ_DATA		;read rcord length with checksum add
         		JMP     .END_RECORD        		
 
 .INVREC  		JSR     STRING
-        		.ASCIS    BELL,CR,LF," :INVALID RECORD TYPE",CR,LF
+        		.ASCII    BELL,CR,LF," :INVALID RECORD TYPE",CR,LF +$80
         		JMP     TERMINATE
         		
 
@@ -93,7 +93,9 @@ CONTINUE 		JSR    	READ_DATA		;read rcord length with checksum add
 .LEDCNT  		JMP    NEXTRECORD
 
 .WRITEERROR 		JSR  	STRING
-        		.ASCIS   BELL,CR,LF," :CANNOT WRITE AT ADDRESS $"
+        		.ASCII   BELL,CR,LF
+			.ASCIS   " :CANNOT WRITE AT ADDRESS $"
+
         		LDA	SRCE+1        		
         		JSR	WR2HEX        		
         		LDA	SRCE        		
@@ -102,22 +104,23 @@ CONTINUE 		JSR    	READ_DATA		;read rcord length with checksum add
         		BRA     TERMINATE	
 
 .CHECKSUMERR        	JSR     STRING
-        		.ASCIS    BELL,LF,CR," :CHECK SUM ERROR",LF,CR        		
+        		.ASCII    BELL,LF,CR," :CHECK SUM ERROR",LF,CR  +$80       		
         		BRA     TERMINATE        		
         		
 .END_RECORD  		JSR    	RD2HEX			;last two byes the CheckSUM
 			CLC			
 			ADC	CHECKSUM			
 			BNE	.CHECKSUMERR				
-        		JSR     STRING        		
-        		.ASCIS    CR,LF," :INTEL-HEX SUCCESSFUL"        		
+        		JSR     STRING
+        		.ASCII  BELL,CR,LF        		
+        		.ASCIS   " :INTEL-HEX SUCCESSFUL"        		
         		JSR     STRING    		        		
-        		.ASCIS    CR,LF," :TOTAL BYTES WRITTEN "			
+        		.ASCII   CR,LF
+        		.ASCIS   " :TOTAL BYTES WRITTEN "			
 			LDY	DEC_SAVE
 			LDA	DEC_SAVE+1
 			JSR	WRDECI        	        		
-        		JSR	WRCRLF        	
-        		
+			
         	.IF	MYWYM        						
         		LDA     #%00001001		;set lights        		
         		STA	REGB

@@ -85,7 +85,7 @@ WRCSI
         		LDA     #'['        		
 	        	JSR     WRCHAR	        	
         		TXA        		
-        		JSR     WRDECI			;write in decimal 
+        		JSR     WRCHAR			;write in decimal 
         		PLA        		
         		JSR     WRCHAR        		;write ANSI Mode        			        		
         		RTS    
@@ -96,7 +96,7 @@ WRCSI
 ;------------------------------------------------------------------------
 CLS     		
 		.IF MYWYM
-			LDX	#02
+			LDX	#'2'
 			LDA	#'J'			;Clrscrn
 			JSR     WRCSI            	;				
         		RTS        	
@@ -109,21 +109,24 @@ CLS
 ; ANSI -  Bring Cursor Home 
 ;------------------------------------------------------------------------
 HOME    		JSR     STRING        		
-        		.ASCIS	ESC, "[1;1H"         		        	        		
+        		.ASCII	ESC
+        		.ASCIS	"[1;1H"
         		RTS       	        	
         		
 ;------------------------------------------------------------------------
 ; ANSI -  Save Cursor Position
 ;------------------------------------------------------------------------
 SAVECUR    		JSR     STRING 
-        		.ASCIS	ESC, "[s"          		        	        		
+			.ASCII	ESC
+        		.ASCIS	"[s"          		        	        		
         		RTS       	        	
 
 ;------------------------------------------------------------------------
 ; ANSI -  Restore Cursor Position 
 ;------------------------------------------------------------------------
 RESTCUR    		JSR     STRING 
-        		.ASCIS	ESC, "[u"          		        	        		
+			.ASCII	ESC	
+        		.ASCIS	"[u"          		        	        		
         		RTS      	        	
         	        	        	
 ;------------------------------------------------------------------------
@@ -184,10 +187,10 @@ WRCHAR
 			PHP				;save flags			
         		PHA        		
 .WAITTX  		LDA     #%00010000
-        		AND     ACIA+1        		
+        		BIT    	ASTAT        		
         		BEQ     .WAITTX        		
         		PLA        		
-        		STA     ACIA        		        		
+        		STA     ADATA        		        		
         		PLP        		
         		RTS
 		
@@ -251,8 +254,8 @@ SCAN_ESC
 			AND     ACIA+1     		; ACIA Status register        	
 			BEQ	.NOTHING		; Anything in the buffer
 			JSR	READACIA	
-			CMP	#ESC
-.NOTHING		RTS		
+.NOTHING		CMP	#ESC
+			RTS		
 		
 		.ELSE
 			LDA     KBDCR           	;Was a key pressed?
@@ -269,8 +272,8 @@ SCAN_ESC
 RDCHAR
   		.IF MYWYM 
 			CLC                		;Read ASCII byte into AC
-.WAITRX  		LDA     #%00001000
-        		AND     ACIA+1     		;ACIA Status register        	
+.WAITRX  		LDA     ACIA+1 
+        		AND     #%00001000		;ACIA Status register        	
         		BEQ     .WAITRX        	
 READACIA       		LDA     ACIA        		
         		PHA        		
