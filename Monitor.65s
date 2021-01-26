@@ -1,5 +1,5 @@
 ; MAIN FILE
-; version 2.04
+; version 2.07
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
@@ -171,7 +171,7 @@ KEYDEF         		LDY     #0              	;Find command in table
                 	.BYTE     	'C'            	;Copy command
                 	.BYTE		'D'		;Dissassembler
                 	.BYTE     	'E'            	;Erase command
-  ;              	.BYTE		'F'		;Fill Command - future
+                	.BYTE		'F'		;Fill Command - future
   			.BYTE		'G'		;GO command - future
   ;			.BYTE		'H'		;Hunt Command - future
                 	.BYTE     	'?'            	;Help command
@@ -200,7 +200,7 @@ FUNCTIONS       	.WORD   CMD_AUT-1  		;Auto line numbering
                 	.WORD   CMD_COP-1      		;Copy command
                 	.WORD	CMD_DISSASSEMBLER-1	;Dissassembler
                 	.WORD   CMD_ERASE-1      	;Erase command                	
-;                	.WORD	CMD_FILL-1		;Fill memory
+                	.WORD	CMD_FILL-1		;Fill memory
 			.WORD   CMD_XEC-1      		;eXecute command
                 	.WORD   CMD_HLP-1      		;Help command
                 	.WORD	CMD_ASCIIDUMP-1		;ASCII DUMP
@@ -311,8 +311,8 @@ INSTDSP			TAY   				;Save op code
 			LDA 	CHAR2-1,X		;*  (If char from char2 is 0,
 			BEQ 	.PPADR3			;*   don't output it)
 			JSR 	WRCHAR
-			LDA 	UNDEF
-			JSR 	WRDECI	
+			;LDA 	UNDEF
+			;JSR 	WRDECI	
 .PPADR3			DEX   
 			BNE 	.PPADR1
 			STX 	PRFLAG			;reset flag to 0
@@ -325,7 +325,8 @@ INSTDSP			TAY   				;Save op code
 			LDA 	(SRCE),Y		;Special print target adr
 			BCC 	.PPADR4			;*  (not displacement)
 .RELADR			JSR 	PCADJ3			;PCL,H + DISPL + 1 to A,Y
-			TAX   			   
+			TAX 
+			INX				;adjust  			   
 			BNE 	PRNTYX			;*     +1 to X,Y
 			INY   		
 PRNTYX			TYA   				;falls through
@@ -347,7 +348,7 @@ PCADJ3			LDY 	SRCE+1
 			TAX   				;* test displ sign (for rel
 			BPL 	.PCADJ4			;*  branch).  Extend neg
 			DEY   				;*  by decrementing PCH
-			SEC				;*  by incrementin PCL
+			;SEC				;*  by incrementin PCL
 			;CLC			
 .PCADJ4			ADC 	SRCE
 			BCC 	.RTS			;PCL+LENGTH (or displ) + 1 to A
@@ -485,7 +486,7 @@ CMD_MEMORY_DUMP		JSR     GET_EXPRES     		;DUMPS MEMORY TO THE SCREEN
         		BNE     .NEWLINE  
         		STZ	ERROR      	        	
         		RTS
-        
+   
 ;------------------------------------------------------------------------
 ; Move a part of memory down (to delete or shorten source lines)
 ;
@@ -671,7 +672,8 @@ INIT            	CLD                     	;You'll never know
                 	INC     HIMEM+1        		;Try next memory page
                 	BPL     .LOOP           	;No need to proceed beyond $8000!
 .THATSIT        	JSR	SHOWMEM
-			JMP     DONEW           	;Do new command
+			LDY 	#$00			;set EOR flag to zero	
+			JMP     DONEW           	;Do new command (Y must be $00)
          
 ;------------------------------------------------------------------------
 ; Probe memory location
@@ -1107,7 +1109,7 @@ NEGATE          	LDA     HEXVAL          	;Negate value
 .RTS            	STA     HEXVAL+1
                 	RTS
 
-;------------------------------------------------------------------------
+;------------------------------------------------------------------------m 0604444444444
 ; Commands file
 ;------------------------------------------------------------------------
 
@@ -1132,7 +1134,7 @@ AUTONUM         	BIT     AUTO_FLAG       	;Is auto line number enabled?
 ; Auto command
 ;------------------------------------------------------------------------
 
-CMD_AUT         	BEQ     SET            		;Nope!
+CMD_AUT       		BEQ     SET            		;Nope!
 	                CMP     #','           	 	;Is line number given?
 	                BEQ     .INC            	;Nope!
 	                JSR     GET_VAL         	;Get the line number value
@@ -1428,10 +1430,12 @@ SHOWMEM         	JSR	STRING
 
 
 ;------------------------------------------------------------------------
-; NEW command
+; NEW command (or N -f force)
 ;------------------------------------------------------------------------
 
-CMD_NEW        		LDA     (LOMEM),Y       	;Save first byte of program (OLD)
+CMD_NEW        		JSR     NNONSPC  		;if there's value after N
+			BNE	DONEW
+			LDA     (LOMEM),Y       	;Save first byte of program (OLD)
                 	BEQ     RTS_MEM         	;But don't do it if already 0!
                 	STA     OLD_SAVE
 
@@ -1610,7 +1614,7 @@ VAL_UNDEF       	JMP     UNDEF_ERROR     	;Exit with undefined label used
 CMD_DISSASSEMBLER	STZ	UNDEF
 			JSR     GET_EXPRES         	;Get Source aka get expression 
                 	BNE	.CONT
-                	LDY     UNDEF           	;Undefined label used?
+                	LDX     UNDEF           	;Undefined label used?
 	                BNE     VAL_UNDEF       	;Yes!
                 	STY     SRCE			;else continue 
                 	STA     SRCE+1      	                	
@@ -1649,6 +1653,7 @@ DISPLYASIC
 ;------------------------------------------------------------------------
 
 CMD_XEC         	BEQ     .RUN            	;Nope! Run from last known addr.
+			STZ	UNDEF			;CLear it
                 	JSR     GET_EXPRES      	;Get address to run from
                 	BNE     VAL_RTS         	;An error occurred!
                 	LDX     UNDEF           	;Undefined label used?
@@ -1674,9 +1679,10 @@ IN_BLANK        	INX                     	;Find end of command in IN
 ;------------------------------------------------------------------------
 ; ADDLINE - Add line to the program 
 ; - todo remove PACK into subroutine and add more optoins aka any repitable chars
+; [LENGTH][LINE NUMBER][PACKED LINE] [EOL]
 ;------------------------------------------------------------------------
 
-ADDLINE         	JSR     GET_VAL         	;Get line number
+ADDLINE         	JSR     GET_VAL         	;Get line number eg: 1000
                 	BEQ     .NOERR          	;No error occurred!
                 	RTS
 
@@ -1804,7 +1810,7 @@ ADDLINE         	JSR     GET_VAL         	;Get line number
 	                LDA     HIMEM+1
 	                SBC     PNTR+1
 	                BCC     .MEMFUL         	;Memory full!
-	                JSR     MOV_UP          	;Move them!
+	                JSR     MOV_UP          	;Move them! (move end marker to end)
 	                PLA                     	;Restore pointer
 	                STA     PNTR+1
 	                PLA
@@ -1889,11 +1895,11 @@ FIND_EOF        	LDY     #0              	;Point to line length
 ; Line not found, pointing at next higher line -> C=1 & Z=0
 ;------------------------------------------------------------------------
 
-FIND_LINE       	LDA     0,Y             	;Get line number to find
+FIND_LINE       	LDA     0,Y             	;Get line number to find eg 1000
 	                STA     HEXVAL
 	                LDA     1,Y
 	                STA     HEXVAL+1
-	                JSR     SET_BOF         	;Start looking at begin of program
+	                JSR     SET_BOF         	;Start looking at begin of program eg 0600
 	                LDY     #0              	;Empty program?
 	                LDA     (PNTR),Y
 	                BEQ     .EOF            	;Yes!
@@ -2340,6 +2346,52 @@ SAVE_OBJ   		LDY     PASS            	;What pass?
 
 MEM_FULL        	LDA     #ERR_MEM        	;Exit with fatal memory ERROR
                 	BRA     FATAL_ERROR     	;(ignoring the stack)
+                	
+;------------------------------------------------------------------------
+;Fill F start end value
+;------------------------------------------------------------------------ 
+  
+CMD_FILL		JSR     GET_VAL    		;Fill Memory
+			STY     SRCE			;Get start address
+                	STA     SRCE+1  
+                	INX
+			JSR     GET_VAL     		;FILL end address
+			STY	DEST
+			STA	DEST+1
+			INX
+			JSR     GET_VAL     		;FILL value
+			;STY	CHAR
+			
+			SEC				;find length add +1
+			LDA	DEST
+			SBC	SRCE
+			STA	LENG
+			LDA	DEST+1
+			SBC	SRCE+1
+			STA	LENG+1
+			TYA				;the value				
+			
+			LDY	LENG+1										
+			BEQ	.partpg			;compare partpage			
+			
+			LDY	#00		
+.fullpg			STA	(SRCE),Y
+			CMP	(SRCE),Y
+			BNE	MEM_FULL 		;probably should be write error
+			INY	
+			BNE	.fullpg
+			INC	SRCE+1
+			DEC	LENG+1			;are we done
+			BNE	.fullpg
+			
+.partpg			LDY	LENG			
+.loop1			STA	(SRCE),Y
+			CMP	(SRCE),Y
+			BNE	MEM_FULL 		;probably should be write error
+			DEY	
+			BNE	.loop1
+			STA	(SRCE),Y		;last byte
+			RTS
 
 ;------------------------------------------------------------------------
 ;  Expand the size of the symbol table by A
@@ -2940,6 +2992,7 @@ BRANCH  		SEC     	         	;branch Taken
         		LDY 	#$01       		;  Then add len + 2
         		LDA	(SRCE),Y
         		JSR 	PCADJ3        		;calculate address
+        		INA				;Inc A
         		STA 	SRCE
         		STY	SRCE+1		
         		BRA 	RTS_TRACE		;save a byte
@@ -3072,9 +3125,9 @@ RESET_RETURN 		LDX	#$ff       		;normal boot up procedure
         		
         		STZ     ACR        		
         		STZ     PCR	    		;pcr   
-			LDA     #%11001011		;irq=off,dtr 		
+			LDA     #%11001011		;IRQ=off,DTR=LOW		
         		STA     ACMND        		
-        		LDA     #%00011111		;19,200 b/s 8 bits
+        		LDA     #%00011111		;19,200 b/s N81 bits/Bayd
         		STA     ACTRL        		        		
         		STZ     REGB			;clear lights aka flash
         		LDA	ADATA			;Clear ACIA

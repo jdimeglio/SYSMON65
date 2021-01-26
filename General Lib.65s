@@ -124,9 +124,8 @@ SAVECUR    		JSR     STRING
 ;------------------------------------------------------------------------
 ; ANSI -  Restore Cursor Position 
 ;------------------------------------------------------------------------
-RESTCUR    		JSR     STRING 
-			.ASCII	ESC	
-        		.ASCIS	"[u"          		        	        		
+RESTCUR    		JSR     STRING 			
+        		.ASCIS	ESC,"[u"          		        	        		
         		RTS      	        	
         	        	        	
 ;------------------------------------------------------------------------
@@ -271,7 +270,7 @@ SCAN_ESC
 
 RDCHAR
   		.IF MYWYM 
-			CLC                		;Read ASCII byte into AC
+			;CLC                		;Read ASCII byte into AC
 .WAITRX  		LDA     ACIA+1 
         		AND     #%00001000		;ACIA Status register        	
         		BEQ     .WAITRX        	

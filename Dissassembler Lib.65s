@@ -512,13 +512,14 @@ BAD			LDY 	#FAIL			;Illegal addressing mode error
 
 ;------------------------------------------------------------------------		
 ; Calculate relative addressing mode
-;------------------------------------------------------------------------		
+;------------------------------------------------------------------------					----BUG
 DOREL			LDX	SAVE_Y 			; restore index			
 			JSR     NNONSPC         	;Find next non space
                 	JSR     GET_EXPRES      	;Evaluate expression                
                 	LDA     UNDEF           	;Undefined label used?
                 	BNE     HEXVAL2OBJ      	;Yes! Can't verify range
-                	CLC                     	;Calculate displacement (+1!)
+
+                	CLC                    		;Calculate displacement (+1!)
                 	LDA     HEXVAL
                 	SBC     PC
                 	STA     HEXVAL
@@ -532,6 +533,9 @@ HEXVAL2OBJ      	RTS
 		;LDA     HEXVAL          	;Save displacement
                 ;JMP     SAVE_OBJ
 		
+        	
+	        	
+        	
         	
 ;------------------------------------------------------------------------
 
