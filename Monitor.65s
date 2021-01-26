@@ -1105,11 +1105,11 @@ NEGATE          	LDA     HEXVAL          	;Negate value
                 	EOR     #$FF
                 	INC     HEXVAL
                 	BNE     .RTS            	;No carry to high byte!
- 	        	;INC             		;??????????????
+ 	        	;INC             		;?????????????? 
 .RTS            	STA     HEXVAL+1
                 	RTS
 
-;------------------------------------------------------------------------m 0604444444444
+;------------------------------------------------------------------------
 ; Commands file
 ;------------------------------------------------------------------------
 
@@ -1423,7 +1423,7 @@ SHOWMEM         	JSR	STRING
                 	JSR     WRWORD
 			JSR	STRING
 			.ASCII	LF,CR 
-			.ASCII " GIOVANNI (C) COPYRIGHT 2020 v2.04 ",CR,LF + $80
+			.ASCII " GIOVANNI (C) COPYRIGHT 2021 v2.07 ",CR,LF + $80
 
 .PRWORDCR       	;JSR     WRWORD
                 	RTS
@@ -2373,8 +2373,8 @@ CMD_FILL		JSR     GET_VAL    		;Fill Memory
 			
 			LDY	LENG+1										
 			BEQ	.partpg			;compare partpage			
-			
-			LDY	#00		
+							
+			LDY	#00			;another way is keep y=0 and increment
 .fullpg			STA	(SRCE),Y
 			CMP	(SRCE),Y
 			BNE	MEM_FULL 		;probably should be write error
@@ -3183,7 +3183,7 @@ CMD_HLP 		JSR     STRING
 		.ASCII "  |[]D1           D5[]|                            E  Erase line",CR,LF                    
 		.ASCII "  |[]D2           D4[]|    CS   $2000              Z  Clear Screen",CR,LF                                                                                       
 		.ASCII "  |[]GND          D3[]|    VIA  $4000              W  Display Register",CR,LF                                              
-		.ASCII "  +-------------------+    ACIA $6000",CR,LF + $80
+		.ASCII "  +-------------------+    ACIA $6000              f  Fill Memory",CR,LF + $80
 USERKEYDEF_RETURN	RTS
 
 ;------------------------------------------------------------------------------------------

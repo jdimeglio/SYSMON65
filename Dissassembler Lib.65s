@@ -517,16 +517,16 @@ DOREL			LDX	SAVE_Y 			; restore index
 			JSR     NNONSPC         	;Find next non space
                 	JSR     GET_EXPRES      	;Evaluate expression                
                 	LDA     UNDEF           	;Undefined label used?
-                	BNE     HEXVAL2OBJ      	;Yes! Can't verify range
-
+                	BNE     HEXVAL2OBJ      	;Yes! Can't verify range		
                 	CLC                    		;Calculate displacement (+1!)
                 	LDA     HEXVAL
                 	SBC     PC
                 	STA     HEXVAL
-                	BPL     .NOBOR          	;No borrow needed
+                	BPL     .NOBOR          	;No borrow needed                	
                 	INC     HEXVAL+1
-.NOBOR          	LDA     HEXVAL+1        	;See if high byte of displacement
-                	SBC     PC+1             	;is 0
+.NOBOR          	DEC	HEXVAL			;adjust
+			LDA     HEXVAL+1        	;See if high byte of displacement
+                	SBC     PC+1             	;is 0                	
                 	BEQ     HEXVAL2OBJ      	;OK!
 .RANGE          	JSR     RANGE_ERROR     	;Range error!
 HEXVAL2OBJ      	RTS
