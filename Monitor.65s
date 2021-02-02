@@ -1,5 +1,5 @@
 ; MAIN FILE
-; version 2.07
+; version 2.07a
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 

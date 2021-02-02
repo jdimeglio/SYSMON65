@@ -343,7 +343,8 @@ SAVE    		STA SAVA        		;Save 6502 HW registers
         		PLA
         		STA SAVP			;svae the flags
         		TSX
-        		STX SAVS			;stack pointer        		
+        		STX SAVS			;stack pointer  
+        		CLD      		
         		RTS	
         	
 ;--------------------------------------------------------------
