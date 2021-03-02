@@ -1,5 +1,5 @@
 ; LIBRARY FILE
-; version 2.01
+; version 2.02
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
@@ -39,20 +39,20 @@ TAB		=$09				;TAB character
 LF		=$0a				;Line feed
 SP		=$20				;Space
 
-TAB1            =8 				;1st tab stop
-TAB2            =12				;2nd tab stop
-TAB3            =21				;3rd tab stop
-
+TAB1            =12				;1st tab stop 8
+TAB2            =14				;2nd tab stop 12
+TAB3            =20				;3rd tab stop 21
+TAB4		=29				;4th tab
 
 
 ;------------------------------------------------------------------------
 ; Constants
 ;------------------------------------------------------------------------
 
-DEF_LOMEM       =     	$06             	;Default lomem page
+DEF_LOMEM       =     	$04             	;Default lomem page
 DEF_AUTO        =     	1000            	;Default Auto line number start
 DEF_INC         =     	10              	;Default Auto increment step
-DEF_ORG         =     	$0280           	;Default .OR
+DEF_ORG         =     	$1000         	;Default .OR
 DEF_OBJLOW      =     	$0200           	;Default lowest object address
 
 

@@ -1,5 +1,5 @@
 ; MAIN FILE
-; version 2.07a
+; version 2.08
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
@@ -95,6 +95,7 @@ GETLINE         	LDX	#$00			;reset buffer index
                 	INY	
                 	CPY     #NUMTABS        	;Maximum number of tab stops
                 	BCC     .TABS_NEXT      	;Try next!
+
 .DOTAB          	STA     IN,X            	;Save this character
                 	INX
                 	JSR     WRCHAR            	; and WRCHAR it
@@ -123,8 +124,9 @@ GETLINE         	LDX	#$00			;reset buffer index
 
 TABS            .BYTE     TAB1           		;1st tab stop
                 .BYTE     TAB2          	 	;2nd tab stop
-                .BYTE     TAB3         	  		;3rd tab stop
-NUMTABS         =     3               		 	;Number of tab stops
+                .BYTE     TAB3 
+                .BYTE     TAB4         	  		;3rd tab stop
+NUMTABS         =     4              		 	;Number of tab stops
 
 
 ;------------------------------------------------------------------------
@@ -1405,7 +1407,7 @@ SHOWMEM         	JSR	STRING
 	                JSR     WRWORD	        	
 	        	JSR      STRING
 	        	.ASCII	LF,CR
-	               	.ASCIS " | | | |_   _|  | . |_  |  --| | |  _| UPPER limit: " 			
+	               	.ASCIS " | | | |_   _|  | . |_  |  --| | |  _| TOTAL RAM:   " 			
 			
 	                LDA     HIMEM+1         	;And himem
 	                LDY     HIMEM
@@ -1414,7 +1416,7 @@ SHOWMEM         	JSR	STRING
 	        
 	        	JSR	STRING
 	        	.ASCII	LF,CR
-			.ASCIS " |_|_|_| |_|    |___|___|____|___|___| TOTAL spent: "
+			.ASCIS " |_|_|_| |_|    |___|___|____|___|___| UPPER spent: "
 				
  	
 	                JSR     FIND_EOFZ       	;Find end of source file
@@ -3171,7 +3173,7 @@ CMD_HLP 		JSR     STRING
 		.ASCII "  +-------------------+  +-------------------+     D  Dissassembler",CR,LF                  
 		.ASCII "  |[]GND         +5V[]|  |[]PA0         IRQ[]|     I  ASCII Dump",CR,LF     
 		.ASCII "  |[]A12         +5V[]|  |[]PA1         NMI[]|     L  List command",CR,LF                        
-		.ASCII "  |[]A7           NC[]|  |[]PA2         R/W[]|     M  Memory command",CR,LF                     
+		.ASCII "  |[]A7           NC[]|  |[]PA2         R/W[]|     M  Memory Dump",CR,LF                     
 		.ASCII "  |[]A6           A8[]|  |[]PA3          02[]|     N  New command",CR,LF                     
 		.ASCII "  |[]A5           A9[]|  |[]PA4         CA1[]|     O  Old command",CR,LF                   
 		.ASCII "  |[]A4          A11[]|  |[]PA5         PB5[]|     R  Renumber command",CR,LF              
@@ -3183,7 +3185,7 @@ CMD_HLP 		JSR     STRING
 		.ASCII "  |[]D1           D5[]|                            E  Erase line",CR,LF                    
 		.ASCII "  |[]D2           D4[]|    CS   $2000              Z  Clear Screen",CR,LF                                                                                       
 		.ASCII "  |[]GND          D3[]|    VIA  $4000              W  Display Register",CR,LF                                              
-		.ASCII "  +-------------------+    ACIA $6000              f  Fill Memory",CR,LF + $80
+		.ASCII "  +-------------------+    ACIA $6000              F  Fill Memory",CR,LF + $80
 USERKEYDEF_RETURN	RTS
 
 ;------------------------------------------------------------------------------------------
