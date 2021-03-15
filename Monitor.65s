@@ -175,7 +175,7 @@ KEYDEF         		LDY     #0              	;Find command in table
                 	.BYTE     	'E'            	;Erase command
                 	.BYTE		'F'		;Fill Command - future
   			.BYTE		'G'		;GO command - future
-  ;			.BYTE		'H'		;Hunt Command - future
+  			.BYTE		'H'		;Hunt Command - future
                 	.BYTE     	'?'            	;Help command
                 	.BYTE	  	'I'		;ASCII Dump	
                 	.BYTE     	'L'            	;List command
@@ -204,6 +204,7 @@ FUNCTIONS       	.WORD   CMD_AUT-1  		;Auto line numbering
                 	.WORD   CMD_ERASE-1      	;Erase command                	
                 	.WORD	CMD_FILL-1		;Fill memory
 			.WORD   CMD_XEC-1      		;eXecute command
+                	.WORD	CMD_HUNT-1		;hunt command
                 	.WORD   CMD_HLP-1      		;Help command
                 	.WORD	CMD_ASCIIDUMP-1		;ASCII DUMP
                 	.WORD   CMD_LST-1      		;List command                
@@ -392,7 +393,58 @@ PRBL2			JSR 	WRSPACE			;Output a blank
 			DEX   
 			BNE 	PRBL2			;Loop until count = 0
 			RTS           		
-                	
+ ;------------------------------------------------------------------------
+;Hunt F start end value
+;------------------------------------------------------------------------ 
+  
+CMD_HUNT		JSR     GET_VAL    		;Fill Memory
+			STY     SRCE			;Get start address
+                	STA     SRCE+1  
+                	INX
+			JSR     GET_VAL     		;FILL end address
+			STY	DEST
+			STA	DEST+1
+			INX
+			JSR     GET_VAL     		;FILL value
+			STY	CHAR
+			
+			SEC				;find length add +1
+			LDA	DEST
+			SBC	SRCE
+			STA	LENG
+			LDA	DEST+1
+			SBC	SRCE+1
+			STA	LENG+1
+			TYA				;the value				
+			
+			LDY	LENG+1										
+			BEQ	.partpg			;compare partpage			
+							
+			LDY	#00			;another way is keep y=0 and increment
+.fullpg			CMP	(SRCE),Y
+			BNE	.skip1 			;probably should be write error
+			JSR	DISPLAY_ADDR
+.skip1			INY	
+			BNE	.fullpg
+			INC	SRCE+1
+			DEC	LENG+1			;are we done
+			BNE	.fullpg
+			
+.partpg			LDY	LENG			
+.loop1			CMP	(SRCE),Y
+			BNE	.skip2 
+			;savey
+			;savya
+			;add + y to A
+			
+			;better of inc source until equals dest				;probably should be write error
+			JSR	DISPLAY_ADDR 
+			LDA	CHAR			;get the value			
+.skip2			DEY	
+			BNE	.loop1
+			;STA	(SRCE),Y		;last byte
+			RTS
+               	
 ;------------------------------------------------------------------------
 ;ASCII DUMP 
 ;------------------------------------------------------------------------
@@ -454,7 +506,7 @@ DISPLAY_ADDR_B 		LDA     #SP        		;basic version
         		JMP     WRCHAR     		;return to caller
 			
 ;------------------------------------------------------------------------
-;ASCII DUMP one line
+;Memory DUMP one line
 ;------------------------------------------------------------------------ 
 
 CMD_MEMORY_DUMP		JSR     GET_EXPRES     		;DUMPS MEMORY TO THE SCREEN
@@ -2052,7 +2104,7 @@ ASSEMBLE        	JSR     SET_BOF         	;Start at begin of program
 
 .NO_LABEL       	JSR     NNONSPC         	;Find next non space now
 	                BEQ     .NEXT           	;That was all, next line please!
-	                CMP     #';'
+	                CMP     #';'			;Compare if its a comment
 	                BEQ     .NEXT           	;The rest is comment!
 	                CMP     #'.'            	;Can it be a directive?
 	                BEQ     .DIRECT         	;Yes! Handle it
@@ -2394,6 +2446,8 @@ CMD_FILL		JSR     GET_VAL    		;Fill Memory
 			BNE	.loop1
 			STA	(SRCE),Y		;last byte
 			RTS
+
+
 
 ;------------------------------------------------------------------------
 ;  Expand the size of the symbol table by A

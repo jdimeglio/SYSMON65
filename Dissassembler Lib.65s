@@ -1,5 +1,5 @@
 ; LIBRARY FILE
-; version 2.00
+; version 2.01
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
@@ -603,6 +603,8 @@ FMT2AM			; calculate the addressing given
 .1BYT			TAY				;mode index now in Y
 .CHECK			JSR	NNONSPC			;next Char in the buffer
 			BEQ 	.DONE			;Check for CR
+			CMP	#';'			;a comment follows 
+			BEQ	FRET
 			CMP 	#SP
 			BNE 	.CONT
 .DONE			LDA 	CHAR			;first Bracket

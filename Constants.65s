@@ -40,9 +40,9 @@ LF		=$0a				;Line feed
 SP		=$20				;Space
 
 TAB1            =12				;1st tab stop 8
-TAB2            =14				;2nd tab stop 12
+TAB2            =16				;2nd tab stop 12
 TAB3            =20				;3rd tab stop 21
-TAB4		=29				;4th tab
+TAB4		=26				;4th tab
 
 
 ;------------------------------------------------------------------------
