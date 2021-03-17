@@ -64,7 +64,7 @@ DEF_OBJLOW      =     	$0200           	;Default lowest object address
 ; PASS must remain the first label here! See INIT routine
 ;------------------------------------------------------------------------
 
-                .ORG    $0018          		;Leave 1st part of ZP free
+                .ORG    $0019          		;Leave 1st part of ZP free
 IN              .RS     128            		;Input and parse buffer 128 Characters input
 	
 	.IF LCD_ROUTINES
@@ -152,7 +152,7 @@ USERKEYDEF	.RS	2			;User defined @keys
 USIRQ		.RS     2			;User IRQ vector
 USBRK		.RS     2			;User BRK vector
 USMNI		.RS     2			;User NMI vector
-USRRS		.RS     2			;User RESET vector
+USRRST		.RS     3			;User RESET vector + checksum
 
 
 ;------------------------------------------------------------------------

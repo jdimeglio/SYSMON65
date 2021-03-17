@@ -1,5 +1,5 @@
 ; MAIN FILE
-; version 2.08
+; version 2.09
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
@@ -1477,7 +1477,7 @@ SHOWMEM         	JSR	STRING
                 	JSR     WRWORD
 			JSR	STRING
 			.ASCII	LF,CR 
-			.ASCII " GIOVANNI (C) COPYRIGHT 2021 v2.07 ",CR,LF + $80
+			.ASCII " GIOVANNI (C) COPYRIGHT 2021 v2.09",CR,LF + $80
 
 .PRWORDCR       	;JSR     WRWORD
                 	RTS
@@ -2188,7 +2188,7 @@ DIRECT          	JSR     NEXT_IN         	;Get directive's name
                 	.BYTE     "EQ"          	;Word directive
                 	.BYTE     "OR"          	;ORG directive
                 	.BYTE     "TA"          	;Target address directive
-                	.BYTE	  "DB"			;Byte	directive	
+                	.BYTE	  "DB"			;Byte directive	
                 	.BYTE     00            	;End of table
 
 .JUMPS          	.DW     DIR_AS-1        	;ASCII string
@@ -2938,7 +2938,7 @@ NMI_RETURN 		 				;Routines http://6502.org/tutorials/interrupts.html
 IRQ_RETURN     		RTI				;IRQ return address - used to store in RAM 
 
 ;------------------------------------------------------------------------------------------
-;
+;IRQ Routine
 ;------------------------------------------------------------------------------------------
 IRQ_VECTOR     		PHA                		;IRQ hardware interrupt
         		PHX
@@ -2953,7 +2953,7 @@ GOBRK   		PLA
         		JMP     (USBRK)
 
 ;------------------------------------------------------------------------------------------
-;        	
+; IRQ Routine return
 ;------------------------------------------------------------------------------------------
 BRK_RETURN     		PLP
         		JSR 	SAVE       		;Save the Registers
@@ -3145,10 +3145,24 @@ CMD_SHOWREG		CLD				;debugging
         	
 ;------------------------------------------------------------------------------------------
 RESET_VECTOR   		SEI				;Hardware reset routine
-
-		.IF	MYWYM
+			LDA	USRRST			;Check what vector to use
+			EOR	#$A5
+			CMP	USRRST+2
+			BNE	COLD_BOOT 
+			JMP     (USRRST)		;User Rest Vector
 		
-			LDA     #%01111111        	;IRQ's Off		
+				
+COLD_BOOT		LDA	#<RESET_RETURN		;User user vector
+			STA	USRRST
+			EOR	#$A5
+			STA	USRRST+2
+			LDA	#>RESET_RETURN	
+			STA	USRRST+1
+			
+
+RESET_RETURN 		
+		.IF	MYWYM	
+ 			LDA     #%01111111        	;6551 IRQ's Off		
         		STA     IER        		
         		STA     IFR        		
 		       	LDA     #%00001111		;inputs and outputs
@@ -3156,13 +3170,8 @@ RESET_VECTOR   		SEI				;Hardware reset routine
 		       	LDA     #%00001111 		;show user that 6502 reseted        		
         		STA     REGB        		;Output LEDS light ON
 		.ENDIF
-		
-;       	lda     #b00010000		;heck if portB button ON for custom RESET
-;        	bit     VIA
-;        	beq     NORMALRESET		;ignore this instructions
-;        	jmp     (USRRST)
-
-RESET_RETURN 		LDX	#$ff       		;normal boot up procedure
+	
+			LDX	#$ff       		;normal boot up procedure
         		TXS
 
 ;			SED
@@ -3179,7 +3188,7 @@ RESET_RETURN 		LDX	#$ff       		;normal boot up procedure
         		
         	.IF	MYWYM
         		
-        		STZ     ACR        		
+        		STZ     ACR        		;ACIA Init
         		STZ     PCR	    		;pcr   
 			LDA     #%11001011		;IRQ=off,DTR=LOW		
         		STA     ACMND        		
@@ -3189,9 +3198,9 @@ RESET_RETURN 		LDX	#$ff       		;normal boot up procedure
         		LDA	ADATA			;Clear ACIA
 		.ENDIF       		
 		
-;FAST Initialise ZP (Check if portB pressed
+							 
              
-                	LDX	#INITDATA_END-INITDATA		
+                	LDX	#INITDATA_END-INITDATA	;FAST Initialise ZP	
 .INITZP         	LDA	INITDATA,X
 			STA	USR_OBJHI,X	
 			DEX
@@ -3209,10 +3218,9 @@ INITDATA		.WORD	$9000			;USR_OBJHI User's safe object end
 			.WORD	USERKEYDEF_RETURN	;USERKEYDEF User defined @keys 
 			.WORD	IRQ_RETURN		;User IRQ vector
 			.WORD	BRK_RETURN		;User BRK vector	
-			.WORD	NMI_RETURN		;User NMI vector	
-INITDATA_END		.WORD	RESET_RETURN		;User RESET vector
-
-	
+INITDATA_END		.WORD	NMI_RETURN		;User NMI vector	
+			;.WORD	RESET_RETURN		;User RESET vector
+				
 
 ;------------------------------------------------------------------------------------------
 ;Display help screen
