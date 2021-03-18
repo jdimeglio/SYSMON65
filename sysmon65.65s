@@ -12,6 +12,7 @@
 		
 ;------------------------------------------------------------------------
 ; Compiler Options/Directives
+;------------------------------------------------------------------------
 
 BRKAS2		= 0					;Add a second BRK byte
 MYWYM		= 0					;has MYWYM Board settings/Chips
@@ -33,7 +34,6 @@ WARM            	CLD                     	;You'll probably know why
                 	JSR     WRCRLF          	;Print CR & LF before we do anything                
                 	STZ     AUTO_FLAG       	;Clear auto flag
                 
-
 ;------------------------------------------------------------------------
 ; Get input line (main program loop)
 ;------------------------------------------------------------------------
@@ -128,7 +128,6 @@ TABS            .BYTE     TAB1           		;1st tab stop
                 .BYTE     TAB4         	  		;3rd tab stop
 NUMTABS         =     4              		 	;Number of tab stops
 
-
 ;------------------------------------------------------------------------
 ; Parse command or line number
 ; A holds the command character
@@ -160,8 +159,6 @@ KEYDEF         		LDY     #0              	;Find command in table
 .SYNERR         	LDA     #ERR_SYN        	;Exit with syntax error
                 	STA     ERROR
                 	RTS
-
-;
 
 ;------------------------------------------------------------------------
 ; Table of commands
@@ -223,14 +220,15 @@ FUNCTIONS       	.WORD   CMD_AUT-1  		;Auto line numbering
 ;----------------------------------------------------------------------------------------
 ; Allows users to add more keys after @
 ;----------------------------------------------------------------------------------------
-CMD_USERKEYS 		JMP    (USERKEYDEF) 
 
+CMD_USERKEYS 		JMP    (USERKEYDEF) 
 
 ;----------------------------------------------------------------------------------------
 ;Clear the screen
 ;----------------------------------------------------------------------------------------
 
 CMD_CLS			JMP	CLS
+
 ;----------------------------------------------------------------------------------------
 CMD_ESC            	STZ     AUTO_FLAG       	;Clear auto flag and therefore OFF
 .CANCEL         	LDA	#BELL			;play bell
@@ -252,8 +250,7 @@ BUMPSRCE        	CLC
         		BCC	.BUMPSRCE     		        	        		        		
         		INC     SRCE+1                 		
 .BUMPSRCE     		RTS     		
-        		
-        		
+        		        		
 ;------------------------------------------------------------------------	
 ;Instruction display - orginal code seems to come from MOS
 ;------------------------------------------------------------------------	
@@ -337,6 +334,7 @@ PRNTYX			TYA   				;falls through
 ;------------------------------------------------------------------------	
 ;print AX as a HEX word
 ;------------------------------------------------------------------------	
+
 PRNTAX			JSR	WR2HEX			;Print target adr of branch (DUPLICATE FUNCTION to WRWORDAY)
 PRNTX			TXA   				; *  and return
 			JMP 	WR2HEX        		
@@ -345,6 +343,7 @@ PRNTX			TXA   				; *  and return
 ;------------------------------------------------------------------------------------------	
 ;PC Adjust
 ;------------------------------------------------------------------------------------------		
+
 PCADJ			SEC
 PCADJ2			LDA 	LENG			;0=1-byte, 1=2-byte, 2=3-byte
 PCADJ3			LDY 	SRCE+1
@@ -357,6 +356,7 @@ PCADJ3			LDY 	SRCE+1
 			BCC 	.RTS			;PCL+LENGTH (or displ) + 1 to A
 			INY   				;*  carry into Y (PCH)
 .RTS			RTS 
+
 ;------------------------------------------------------------------------	
 ; Expand Mnemic
 ; copy the 2 chars at R/LMNETB,X
@@ -385,15 +385,18 @@ EXPMNE			LDA 	LMNETB,X		;Expand Mnemic
 			CPX 	#$03
 			BNE 	.NEXT
 			RTS	
+			
 ;------------------------------------------------------------------------       		
 ;Print Blank Lines 
 ;------------------------------------------------------------------------   	
+
 PRBLNK			LDX 	#$03			;Blank count
 PRBL2			JSR 	WRSPACE			;Output a blank
 			DEX   
 			BNE 	PRBL2			;Loop until count = 0
 			RTS           		
- ;------------------------------------------------------------------------
+			
+;------------------------------------------------------------------------
 ;Hunt F start end value
 ;------------------------------------------------------------------------ 
   
@@ -635,9 +638,9 @@ PRINT_SRCE     		LDA     (SRCE),Y       		;Get character (also GLobal Print)
                 	JSR     WRCHAR          	; and print it
                 	INY				;check if it exceed 127
                 	PLA                
-                	BPL	PRINT_SRCE      	; is bit=8 =1   
-                	       
+                	BPL	PRINT_SRCE      	; is bit=8 =1                   	       
                 	RTS
+                	
 ;------------------------------------------------------------------------
 ; Error Messages - TODO
 ;------------------------------------------------------------------------
@@ -655,13 +658,11 @@ PNTR_ERR_OPE    	.ASCIS     	" :OPERAND"          			;Operand error
 PNTR_ERR_MNE    	.ASCIS     	" :MNEMONIC "          			;Mnemonic error
 PNTR_ERR_EXT    	.ASCIS     	" :EXTRAT DEFINATION"          		;Extra definition error
 
-
 TEXT1        		.ASCIS     	"--------------------------"
 PNTR_AUTOTEXT		.ASCIS		"AUTONUM ENABLE starting "
 PNTR_ERRORS     	.ASCII     	" COMPILE ERROR(s)",CR,LF + $80
 PNTR_CANCEL     	.ASCIS     	"/"		
 PNTR_CODE_ORG  		.ASCIS     	".ORG ->"
-
 
 
 ERR_SYN		=	PNTR_ERR_SYN - TEXT	
@@ -682,9 +683,7 @@ AUTOTEXT	=	PNTR_AUTOTEXT  - TEXT1
 STR_ERRORS      =     	PNTR_ERRORS  - TEXT1	
 STR_CANCEL      =     	PNTR_CANCEL  - TEXT1
 CODE_ORG	=	PNTR_CODE_ORG  - TEXT1
-
         
-
 ;------------------------------------------------------------------------
 ; Find next non space
 ; Z=1 if EOL found
@@ -702,7 +701,6 @@ NNONSPC         	LDA     IN,X            	;Is this a space?
 ;------------------------------------------------------------------------
 ; Initialise the assembler before we can start
 ;------------------------------------------------------------------------
-
 
 INIT            	CLD                     	;You'll never know
 		.IF LCD_ROUTINES		
@@ -1100,10 +1098,8 @@ WRDECI         		STY     EXP_SAVE        	;
                 	BPL     .DECLOOP        	;Not done them all yet!
                 	RTS
 
-
 .DECIL          .BYTE     $01,$0a,$64,$e8,$10
 .DECIH          .BYTE     $00,$00,$00,$03,$27
-
 
 ;------------------------------------------------------------------------
 ; Check object if code was generated
@@ -1148,6 +1144,7 @@ PRINT_OBJ      		LDA     TA            	  	;See if code was generated
                 	JSR     WRWORD 
                 	JMP     WRCRLF           	;Followed by CR
 .PRINT_OBJ_RTS		RTS
+
 ;------------------------------------------------------------------------
 ; Make HEXVAL negative
 ;------------------------------------------------------------------------
@@ -2188,7 +2185,7 @@ DIRECT          	JSR     NEXT_IN         	;Get directive's name
                 	.BYTE     "EQ"          	;Word directive
                 	.BYTE     "OR"          	;ORG directive
                 	.BYTE     "TA"          	;Target address directive
-                	.BYTE	  "DB"			;Byte directive	
+                	.BYTE	  "DB"			;Byte directive	FUTUr
                 	.BYTE     00            	;End of table
 
 .JUMPS          	.DW     DIR_AS-1        	;ASCII string
@@ -2446,8 +2443,6 @@ CMD_FILL		JSR     GET_VAL    		;Fill Memory
 			BNE	.loop1
 			STA	(SRCE),Y		;last byte
 			RTS
-
-
 
 ;------------------------------------------------------------------------
 ;  Expand the size of the symbol table by A
@@ -2921,7 +2916,6 @@ SAVE_ENDSYM     	STA     (DEST),Y        	;Save low byte of offset only
 ;------------------------------------------------------------------------
 ;GENRAL LIBRARY ROUTINES BELOW
 
-   
 
 	.include	"General Lib.65s"				
 
@@ -2966,8 +2960,6 @@ BRK_RETURN     		PLP
 XBRK			JSR 	TRACE_DIS		;show registers		
 			CLI
 			JMP    	WARM 
-
-
 
 ;------------------------------------------------------------------------
 ; Tracing
