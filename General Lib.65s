@@ -1,5 +1,5 @@
 ; LIBRARY FILE
-; version 2.01
+; version 2.09
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
@@ -391,7 +391,8 @@ LCD_LINIT		LDX 	#$04			;do function set 4 times
 			RTS   
 		
 ;------------------------------------------------------------------------
-
+;LCD Scroll
+;------------------------------------------------------------------------
 LCD_SCROLL		LDA	#%0000001
 				
 
@@ -412,8 +413,8 @@ LCD_HOME		LDA	#%00000011
 			RTS		
 						
 
- ;------------------------------------------------------------------------			
-; *** Wait for LCD busy bit to clear
+;------------------------------------------------------------------------			
+;Wait for LCD busy bit to clear
 ;------------------------------------------------------------------------
 LCD_BUSY		PHA
 .LCD_BUSY0		LDA	LCD0			;read from LCD register 0

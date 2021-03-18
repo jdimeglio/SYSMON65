@@ -146,6 +146,10 @@ KBDCR           = io_getc 	        	;Keyboard control register
 
 ;------------------------------------------------------------------------
 ; Start Here
+; 100c cccc Space
+; 110c cccc DELIM
+; 101c cccc OTHER
+; 
 ;---------------------------------------------------------------------
 			*= $1000
 START		
@@ -159,15 +163,23 @@ START
 			STA	DEST
 			LDA	#$20
 			STA	DEST+1		;$2000 location to store	
-			ldy	#0
-			
+
+
+
+;---------------------------------------------------------------------
+PACK1			LDY	#0			
 .LOOP           	LDA	(SRCE),y						
-			BMI	.eol
+			BEQ	.eol		;ends with a ZERO
 						
-			cmp	#SP
+
+
+			CMP	#SP
 			beq	.pack
 			CMP     #DASH 
-			BEQ	.pack			
+			BEQ	.pack	
+			CMP	#'_'		
+			BEQ	.pack
+
 			JSR	BUMPSOURCE		
 			
 .WRITE          	STA     (DEST),Y      	;Save normal character
@@ -190,13 +202,23 @@ START
 
 	                JSR	BUMPSOURCE      ;Compensate for normal exit
 .PCKEXIT        	LDA     DELIM           ;Was it space or dash?
-	                EOR     #' '            ;  (Makes A=0 if it is space                
+	                CMP     #' '            ;  (Makes A=0 if it is space                
 	                BEQ     .SPACE          ;It was space!
+	                CMP	#'_'
+	                BEQ	.DASH
 	                LDA     #%01000000      ;Set dash flag
+			BRA	.SPACE
+.DASH			LDA	#%00100000	;
 .SPACE          	ORA     COUNT          	;Combine with counter
 			ORA	#%10000000	;Set PACK flag
 	                BRA     .WRITE          				
 .eol			RTS
+
+
+
+
+
+
 
 
 ;-----------------------------------------------------------------------------		
@@ -237,7 +259,7 @@ help		.ASCII CR,"  _______  _______  _____    ______  __ ",CR,LF
 		.ASCII "  |[]D1           D5[]|                            E  Erase line",CR,LF                    
 		.ASCII "  |[]D2           D4[]|    CS   $2000              Z  Clear Screen",CR,LF                                                                                       
 		.ASCII "  |[]GND          D3[]|    VIA  $4000              W  Display Register",CR,LF                                              
-		.ASCII "  +-------------------+    ACIA $6000",CR,LF + $80		
+		.ASCII "  +-------------------+    ACIA $6000",CR,LF + $00		
 		
 		
 		*= $3000

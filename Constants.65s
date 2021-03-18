@@ -179,7 +179,7 @@ ACIA    	= $8800
 	.ELSE
 VIA     	= $4000				;My board settings
 ACIA    	= $6000				
-		
+CS		= $2000		
 	.ENDIF
 	
 		
