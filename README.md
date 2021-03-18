@@ -1,22 +1,30 @@
-# 65C02-Monitor called SYSMON65
-
-This is a 65C02 monitor developed for my 65C02 board. It contains a 65C02, 6551(ACIA), 6522(VIA) and the usual ROM (27C256), RAM decoding etc. It can be ported onto any 65C02 based computer with some minor modifications. SYSMON65 includes and uses the 65C02 instructions (eg: phx,plx,bra etc) . However it could be converted back to a 6502 only instructions - if anyone was really insterested.
-
-After searching the net I didn’t like many if not all the 6502 OS/Monitors (or 65C02). In my opinion I liked bits of them. So I decided to create my own. I began with little care about space, more functionality, but in the end, i was forced to keep it real tight. 
-
-My goal was for it to be a development machine/ bench top computer. Able to paste code to the terminal, compile it, dump, decode it, edit it etc. Some of this code had been inspired by many before me - the A1 Assembler by San Bergmans.  
-
-I liked the front editor but didn’t come with a disassembler. It’s 2 pass assembler and felt solid - but mostly written for an Apple.  
-With his permission i used his front end, but i ended up re-writing allot of it and certainly went over every line.  The back end completely replaced. 
-
-On the other hand The KRUSADER by Ken Wessen had the super-efficient dissembler that I’ve seen before (probably created by MOS and used by Apple) and it was tackling the additional 65C02 instructions. With respect i didn’t like the editor. 
-
-The old DOS debug command is how i wanted the console to feel like, in other words, mistyping something means hitting the backspace not having to retype the whole line again as many of these monitors have you do – nuts.
-
-So this is a full 2 pass assembler, with local and global labels, directives, the lot. I’ve also added a 65C02 dissembler, step by step debugging aka tracing, memory dump, ascii dump, fill, delete, block move, intel hex loader.  
-
-I’ve tested this on a real N65C02 computer. I’ve also included LCD 16x2 code - again also tested on real hardware.  
-Its currently takes just over 3.2KB
 
 
 
+
+
+
+# SYSMON65
+
+*SYSMON65* was developed for my 65C02 single board computer (SBC). My SBC contains a the venerable 65C02 processor, a 6551 (ACIA), a 6522 (VIA), and the core chips found in most SBCs which typically include, a ROM (27C256) chip, a RAM chip, and address decoding logic chips. The 
+
+This monitor may be ported to other 65C02 based SBCs with a few minor modifications. SYSMON65 includes and uses the 65C02 instructions (eg: phx,plx,bra etc) . However it could be converted back to a 6502 only instructions - if anyone was really interested - such as  KIM-1, Apple II series computers, the Commodore 64, the VIC-20, and more.
+
+After searching the internet and reviewing the few 6502 operating systems and monitor software that I could find, I discovered that I only liked some of the functionality of each. Therefore, I decided to develop my own monitor software. During early development, the memory footprint of the monitor software was not considered, but as development progressed this became a priority, so I kept the code size “real tight”!
+
+My goal for *SYSMON65* is to be a software development tool on an SBC. The user may paste code into the terminal, compile code, do memory dumps, decode, edit code, and much more…
+
+Parts of my code was inspired by the following:
+
+- The *A1 Assembler* by San Bergmans
+   I like the front-end editor, but the assembler does not come with a dissembler. The assembler is a 2-pass assembler and feels very solid, but it was written primarily for an Apple computer. With San’s permission I used his front-end editor code, reviewed every line, and eventually re-wrote most of this. 
+
+
+- The KRUSADER by Ken Wessen
+   This has a super-efficient disassembler (most likely created by MOS and used by Apple) and includes the specific 65C02 instructions. With respect, I didn’t like the front-end editor.
+
+The look and feel of *SYSMON65* were heavily influenced by the famous line-oriented debugger Debug https://en.wikipedia.org/wiki/Debug_(command) found in DOS (those were the days!). Some *Debug* front-end functionality can be found in *SYSMON65*, including the [Backspace] key to fix mistypes, and command history functionality with the [Up arrow] key.
+
+*SYSMON65* is a full 2-pass assembler, with local and global labels, directives, and more. A 65C02 disassembler is included which includes Step-By-Step debugging (i.e., Tracing), memory dump, ASCII dump, fill, delete, block move, intel hex loader and more.
+
+*SYSMON65* has been tested on a N65C02 hardware. It also includes code for an LCD 16x2 module. The software currently takes just over 3.2KB of memory space.
