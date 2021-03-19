@@ -6,7 +6,7 @@
 
 # SYSMON65
 
-*SYSMON65* was developed for my 65C02 single board computer (SBC). My SBC contains the venerable 65C02 processor, a 6551 (ACIA), a 6522 (VIA), and the core chips found in most SBCs which typically include, a ROM (27C256) chip, a RAM chip, and address decoding logic chips. The 
+*SYSMON65* was developed for my 65C02 single board computer (SBC). My SBC contains the venerable 65C02 processor, a 6551 (ACIA), a 6522 (VIA), and the core chips found in most SBCs which typically include, a ROM (27C256) chip, a RAM chip, and address decoding logic chips.
 
 This monitor may be ported to other 65C02 based SBCs with a few minor modifications. SYSMON65 includes and uses the 65C02 instructions (eg: phx,plx,bra etc) . However it could be converted back to a 6502 only instructions - if anyone was really interested - such as  KIM-1, Apple II series computers, the Commodore 64, the VIC-20, and more.
 
