@@ -206,9 +206,9 @@ PACK1			LDY	#0
 	                BEQ     .SPACE          ;It was space!
 	                CMP	#'_'
 	                BEQ	.DASH
-	                LDA     #%01000000      ;Set dash flag
+	                LDA     #%01000000      ;Set _ flag
 			BRA	.SPACE
-.DASH			LDA	#%00100000	;
+.DASH			LDA	#%00100000	;Set dash flag
 .SPACE          	ORA     COUNT          	;Combine with counter
 			ORA	#%10000000	;Set PACK flag
 	                BRA     .WRITE          				
