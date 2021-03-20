@@ -1,5 +1,5 @@
 ; MAIN FILE
-; version 2.09
+; version 2.10
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
@@ -448,6 +448,9 @@ CMD_HUNT		JSR     GET_VAL    		;Fill Memory
 			;STA	(SRCE),Y		;last byte
 			RTS
                	
+               	
+               	
+               	
 ;------------------------------------------------------------------------
 ;ASCII DUMP 
 ;------------------------------------------------------------------------
@@ -616,15 +619,15 @@ MOV_UP          	LDX     LENG+1          	;We have started the move at the
 ;------------------------------------------------------------------------
 
 PRINT_MSGS     		LDY	ERROR
-			BNE	.ERRORMSGS		;normal string		
-			LDY	#<TEXT1			;Error texts
+			BNE	ERRORMSGS		;normal string		
+PRINT_ERR		LDY	#<TEXT1			;Error texts
 			STY	SRCE
 			LDY	#>TEXT1 
 			STY	SRCE+1
 			TAY				;index to message string
 			BRA	PRINT_SRCE
 		
-.ERRORMSGS		LDA	#<TEXT			;noramal texts		
+ERRORMSGS		LDA	#<TEXT			;noramal texts		
 			STA	SRCE
 			LDA	#>TEXT 
 			STA	SRCE+1				
@@ -657,6 +660,7 @@ PNTR_ERR_DIR    	.ASCIS     	" :ILLEGAL DIRECTIVE"          		;Illegal directive
 PNTR_ERR_OPE    	.ASCIS     	" :OPERAND"          			;Operand error
 PNTR_ERR_MNE    	.ASCIS     	" :MNEMONIC "          			;Mnemonic error
 PNTR_ERR_EXT    	.ASCIS     	" :EXTRAT DEFINATION"          		;Extra definition error
+PNTR_ERR_WRT    	.ASCIS     	" :UNABLE TO WRITE/READ"          	;Read/Write Error
 
 TEXT1        		.ASCIS     	"--------------------------"
 PNTR_AUTOTEXT		.ASCIS		"AUTONUM ENABLE starting "
@@ -676,6 +680,7 @@ ERR_DIR		=	PNTR_ERR_DIR - TEXT
 ERR_OPE		=	PNTR_ERR_OPE - TEXT	   
 ERR_MNE		=	PNTR_ERR_MNE - TEXT	    
 ERR_EXT		=	PNTR_ERR_EXT - TEXT	   
+ERR_WRT		=	PNTR_ERR_WRT - TEXT	   
 
 ;standard messages
 
@@ -1474,7 +1479,7 @@ SHOWMEM         	JSR	STRING
                 	JSR     WRWORD
 			JSR	STRING
 			.ASCII	LF,CR 
-			.ASCII " GIOVANNI (C) COPYRIGHT 2021 v2.09",CR,LF + $80
+			.ASCII " GIOVANNI (C) COPYRIGHT 2021 v2.10",CR,LF + $80
 
 .PRWORDCR       	;JSR     WRWORD
                 	RTS
@@ -2399,51 +2404,42 @@ MEM_FULL        	LDA     #ERR_MEM        	;Exit with fatal memory ERROR
                 	BRA     FATAL_ERROR     	;(ignoring the stack)
                 	
 ;------------------------------------------------------------------------
-;Fill F start end value
+;Fill F start range value
 ;------------------------------------------------------------------------ 
   
 CMD_FILL		JSR     GET_VAL    		;Fill Memory
-			STY     SRCE			;Get start address
-                	STA     SRCE+1  
+			STY     HIMEM			;Get start address
+                	STA     HIMEM+1  
                 	INX
-			JSR     GET_VAL     		;FILL end address
-			STY	DEST
-			STA	DEST+1
+			JSR     GET_VAL     		;Get RANGE 
+			STY	LENG
+			STA	LENG+1
 			INX
 			JSR     GET_VAL     		;FILL value
-			;STY	CHAR
-			
-			SEC				;find length add +1
-			LDA	DEST
-			SBC	SRCE
-			STA	LENG
-			LDA	DEST+1
-			SBC	SRCE+1
-			STA	LENG+1
-			TYA				;the value				
-			
-			LDY	LENG+1										
-			BEQ	.partpg			;compare partpage			
-							
-			LDY	#00			;another way is keep y=0 and increment
-.fullpg			STA	(SRCE),Y
-			CMP	(SRCE),Y
-			BNE	MEM_FULL 		;probably should be write error
-			INY	
-			BNE	.fullpg
-			INC	SRCE+1
-			DEC	LENG+1			;are we done
-			BNE	.fullpg
-			
-.partpg			LDY	LENG			
-.loop1			STA	(SRCE),Y
-			CMP	(SRCE),Y
-			BNE	MEM_FULL 		;probably should be write error
-			DEY	
-			BNE	.loop1
-			STA	(SRCE),Y		;last byte
+		        TYA 
+.USERFILL 		LDX  	LENG+1		
+         		BEQ  	.FILEFT   	
+         		LDY  	#$00     	
+.PGFILL   		JSR	PROBE
+			BNE	.WRERROR	
+         		INY           		
+         		BNE  	.PGFILL   	
+         		INC 	HIMEM+1   
+         		DEX           
+         		BNE  	.PGFILL   
+.FILEFT   		LDX  	LENG    
+         		BEQ  	.DONEFILL 
+         		LDY  	#$00     
+.FILAST   		JSR	PROBE
+			BNE	.WRERROR
+         		INY           
+         		DEX           
+         		BNE  	.FILAST   
+.DONEFILL 		RTS           	
+.WRERROR		LDA 	#ERR_WRT					
+			STA	ERROR			
 			RTS
-
+		
 ;------------------------------------------------------------------------
 ;  Expand the size of the symbol table by A
 ;  Presuming DEST points to current end flag ($00)
