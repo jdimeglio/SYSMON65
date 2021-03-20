@@ -2925,7 +2925,16 @@ NMI_VECTOR     		JMP     (USMNI)        		;NMI hardware interrupt handler
 ;------------------------------------------------------------------------------------------
 NMI_RETURN 		 				;Routines http://6502.org/tutorials/interrupts.html	
         			
-IRQ_RETURN     		RTI				;IRQ return address - used to store in RAM 
+IRQ_RETURN    		;JSR	SAVE  	         
+         		;LDA  	ASTAT 			;Read 6551 ACIA status register
+         		;AND 	#$88   			;Isolate bits 7: Interrupt has occured and 3: receive data register full 
+         		;EOR  	#$88   			;Invert state of both bits 		
+         		;BNE  	.BRKINSTR 		;IF bit 7 OR bit 3 = 1: no valid data in receive data register          		       
+                	;LDX  	INCNT  			; ELSE, Store keystroke in keystroke buffer address
+         		;STA  	IN,X 			;  indexed by INCNT: keystroke buffer input counter
+         		;INC  	INCNT  			;Increment keystroke buffer input counter
+.BRKINSTR		;JSR	RESTORE         
+			RTI				;IRQ return address - used to store in RAM 
 
 ;------------------------------------------------------------------------------------------
 ;IRQ Routine
@@ -3179,14 +3188,13 @@ RESET_RETURN
         		STZ     ACR        		;ACIA Init
         		STZ     PCR	    		;pcr   
 			LDA     #%11001011		;IRQ=off,DTR=LOW		
+			;LDA	#%00001001		;IRQ=on
         		STA     ACMND        		
         		LDA     #%00011111		;19,200 b/s N81 bits/Bayd
         		STA     ACTRL        		        		
         		STZ     REGB			;clear lights aka flash
         		LDA	ADATA			;Clear ACIA
 		.ENDIF       		
-		
-							 
              
                 	LDX	#INITDATA_END-INITDATA	;FAST Initialise ZP	
 .INITZP         	LDA	INITDATA,X
@@ -3195,7 +3203,6 @@ RESET_RETURN
                 	BPL	.INITZP	               			
 			CLI				;restore Interrupts
         		JMP	COLD       	
-	
 
 INITDATA		.WORD	$9000			;USR_OBJHI User's safe object end		
 			.BYTE	$00 			;Lomem address   | Don't
