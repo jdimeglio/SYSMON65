@@ -7,7 +7,9 @@
 		
      		
 ;--------------------------------------------------------------------
-;prints a string ending with EOS 
+;prints a string ending with EOS - checkign for packed strings
+;--------------------------------------------------------------------        		
+        		
 STRING  		PHP				;print stringz to screen
 	        	PHA	        	
         		PHX        		
@@ -17,27 +19,25 @@ STRING  		PHP				;print stringz to screen
         		LDA     SRCE+1        		
         		PHA        		
         		TSX        		
-        		LDA     $0107,x        		
+        		LDA     $0107,x        		;get return address-1	
         		STA     SRCE        		
         		LDA     $0108,x
-        		STA     SRCE+1        		
-        		LDY     #$01        		
-.NEXTCHAR 		LDA     (SRCE),Y        		
-			PHA
-			AND	#%01111111		;strip negative bit			
-        		JSR     WRCHAR        		
-        		PLA
-        		BMI	.ADJUST_RETURN 		;if z=1 then end.
-        		INY
-        		BNE     .NEXTCHAR		;more than $ff characters        		
-        		INC     SRCE+1
-        		BRA     .NEXTCHAR      		
-.ADJUST_RETURN 		TYA
-        		CLC	        		
-        		ADC     SRCE			;BUMPSRCE        		
+        		STA     SRCE+1        		        		
+.NEXTCHAR 		INC	SRCE
+        		BNE     .SKIPBUMP		;edge of page 
+        		INC     SRCE+1	
+.SKIPBUMP		LDY	#$01			;trick to save some bytes
+			LDA     (SRCE)   		
+			BEQ	.ADJUST_RETURN		;EOS Marker
+			BPL	.NOTPACK			;is it packed?			
+			JSR	UNPACK_DECODE		;return character AC and count YR			
+.NOTPACK		JSR     WRCHAR        		;write character
+			DEY
+			BNE	.NOTPACK
+        		BRA     .NEXTCHAR      		        		
+.ADJUST_RETURN 		LDA	SRCE
         		STA     $0107,x        		
         		LDA     SRCE+1        		
-        		ADC     #$00        		
         		STA     $0108,x        		
         		PLA        			;Restore SRC
         		STA     SRCE+1       	 		
@@ -47,7 +47,8 @@ STRING  		PHP				;print stringz to screen
         		PLX        		
         		PLA        	
         		PLP        		
-        		RTS    
+        		RTS          		
+        		  
 ;------------------------------------------------------------
 ; ANSI GOTO x & y 
 ;------------------------------------------------------------

@@ -16,10 +16,10 @@ HELLO    	LDX #0
     		JSR ECHO
     		INX
    		BNE .1
-.2	    	ORA #1000.0000
+.2		ORA #1000.0000
     		JMP ECHO
 .3
- ;---------------
+;---------------
  	.AT -/HELLO WORLD/
 ;---------------
 COUNT	   	JSR .2
@@ -31,5 +31,6 @@ COUNT	   	JSR .2
     		INX
     		CPX #10
    		BCC .1
-.2	    	LDA #CR
+.2		LDA #CR
    		JMP ECHO
+-

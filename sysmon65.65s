@@ -1408,7 +1408,7 @@ CMD_LST         	JSR     BEG_END         	;Get begin and end line parameters
                 	JSR     PRDECI_HEXVAL
                 	JSR     WRSPACE
 
-.SKIP           	JSR     UNPACK          	;Unpack current line
+.SKIP           	JSR     UNPACK_IN          	;Unpack current line into keyboard buffer
                 	LDX     #0              	;Print the entire unpacked line
 .PRINT          	LDA     IN,X
 	                INX
@@ -1453,15 +1453,22 @@ CMD_MEM         	BEQ     SHOWMEM         	;Yes! Set Lomem,Himem
  
                 
 SHOWMEM         	JSR	STRING
-			.ASCII "  _____ __ __    ___ ___ ____ ___ ___ ",LF,CR
-			.ASCIS " |     |  |  |  |  _|  _|    |   |_  | LOWER limit: "				 			 
- 
-			LDA     LOMEM+1         	;Print lomem
+			
+			.db	$e1,$a5,$e1,$a2,$e1,$a2,$e1,$a5,$e1,$a5,$e1,$a5,$e1,$a5,$e1,$a3
+			.db	$e1,$a3,$e1,$0d,$0a,$7c,$e3,$a2,$7c,$e2,$7c,$e2,$7c,$e3,$a2,$7c
+			.db	$e5,$7c,$e5,$7c,$e3,$7c,$e1,$7c,$e2,$a1,$7c,$e2,$a1,$7c,$e1,$4c
+			.db	$4f,$57,$45,$52,$e1,$6c,$69,$6d,$69,$74,$3a,$e1,$00
+			
+ 			LDA     LOMEM+1         	;Print lomem
 	                LDY     LOMEM
 	                JSR     WRWORD	        	
 	        	JSR      STRING
-	        	.ASCII	LF,CR
-	               	.ASCIS " | | | |_   _|  | . |_  |  --| | |  _| TOTAL RAM:   " 			
+	        
+	               	.DB	CR,LF
+			.DB	$7c,$a2,$e3,$7c,$a1,$e3,$a1,$7c,$a2,$e3,$7c,$e1,$7c,$e1,$7c,$e1
+			.DB	$7c,$e2,$7c,$e2,$7c,$e1,$7c,$e1,$7c,$e1,$7c,$e1,$2e,$e1,$7c,$a1
+			.DB	$e2,$7c,$e1,$54,$4f,$54,$41,$4c,$e1,$52,$41,$4d,$3a,$e3,$00
+	               	
 			
 	                LDA     HIMEM+1         	;And himem
 	                LDY     HIMEM
@@ -1469,8 +1476,11 @@ SHOWMEM         	JSR	STRING
 	                
 	        
 	        	JSR	STRING
-	        	.ASCII	LF,CR
-			.ASCIS " |_|_|_| |_|    |___|___|____|___|___| UPPER spent: "
+	        	
+	        	.DB	LF,CR
+			.DB	$7c,$a5,$7c,$e1,$7c,$a1,$7c,$e1,$7c,$a5,$7c,$a1,$7c,$a1,$7c,$a1
+			.DB	$7c,$a5,$7c,$a1,$7c,$a3,$7c,$a3,$7c,$a3,$7c,$e1,$55,$50,$50,$45
+			.DB	$52,$e1,$73,$70,$65,$6e,$74,$3a,$e1,$00
 				
  	
 	                JSR     FIND_EOFZ       	;Find end of source file
@@ -1479,7 +1489,7 @@ SHOWMEM         	JSR	STRING
                 	JSR     WRWORD
 			JSR	STRING
 			.ASCII	LF,CR 
-			.ASCII " GIOVANNI (C) COPYRIGHT 2021 v2.10",CR,LF + $80
+			.ASCII "All rights reserved v2.10",CR,LF,EOS
 
 .PRWORDCR       	;JSR     WRWORD
                 	RTS
@@ -1775,6 +1785,8 @@ ADDLINE         	JSR     GET_VAL         	;Get line number eg: 1000
 	                BEQ     .PACK           	;Yes! Pack it!
 	                CMP     #DASH           	;Is it a dash?
 	                BEQ     .PACK           	;Yes! Pack it!
+	                CMP	#'_'			;It it horizontal grz	
+			BEQ	.PACK			;Yes! Pack it!	
 	                CMP     #CR             	;Is it end of line?
 	                BEQ     .EOL            	;Yes! Packed entire line now!
 .WRITE          	STA     IN,Y            	;Save normal character
@@ -1795,11 +1807,16 @@ ADDLINE         	JSR     GET_VAL         	;Get line number eg: 1000
 	                INX                     	;Compensate for normal exit
 .PCKEXIT        	DEX                     	;We're too far now
                 	LDA     DELIM           	;Was it space or dash?
-	                EOR     #' '            	;  (Makes A=0 if it is space                
-	                BEQ     .SPACE          	;It was space!
-	                LDA     #%01000000      	;Set dash flag
-.SPACE          	ORA     COUNT           	;Combine with counter
-			ORA	#%10000000		;Set PACK flag
+	                CMP     #' '            	;                  
+	                BEQ     .SPACE          	;It was space!	                
+	                CMP	#DASH
+	                BEQ	.DASH	                
+			LDA	#%10100000		;Set dash flag
+			BRA	.ADDCOUNT
+.DASH	                LDA     #%11000000      	;Set dash flag
+			BRA	.ADDCOUNT
+.SPACE          	LDA	#%11100000      	;Set dash flag
+.ADDCOUNT		ORA     COUNT           	;Combine with counter			
 	                BRA     .WRITE          	;Always taken!
 
 .EOL            	TYA                     	;Add 3 byte overhead to length
@@ -1993,7 +2010,7 @@ NEXT_LINE       	LDY     #0              	;Point to line length
 ; Unpack source line to IN (Without line number)
 ;------------------------------------------------------------------------
 
-UNPACK          	LDY     #0              	;Get line length
+UNPACK_IN          	LDY     #0              	;Get line length
 	                LDA     (PNTR),Y
 	                SEC
 	                SBC     #3              	;Subtract length and line-num
@@ -2012,23 +2029,42 @@ UNPACK          	LDY     #0              	;Get line length
 	                STA     IN,X
 	                RTS
 
-.UNPACK         	PHA                     	;Save packed type (space or -)
-	                STY     DELIM           	;Save source code pointer
-	                AND     #%00111111     		;Strip away type flag
-	                TAY                     	;	 to keep repeat counter
-	                PLA                     	;Find out what type it was
-	                ASL
-	                BMI     .DASH           	;It was a DASH!
-	                LDA     #' '            	;Expand a space
-	                BNE     .EXPAND         	;Always taken!
+.UNPACK         	STY     DELIM           	;Save source code pointer
+	                JSR	UNPACK_DECODE		;return character and count
 
-.DASH           	LDA     #DASH           	; Expand a dash
 .EXPAND         	STA     IN,X            	; Save character to IN
 	                INX
 	                DEY                     	;Decrement counter
 	                BNE     .EXPAND         	;Not done yet!
 	                LDY     DELIM           	;Restore index in source
 	                BNE     .NEXT           	;Always taken!
+
+;------------------------------------------------------------------------
+; Decode unpack ; returns y = count A= character Z=1 if EOL
+; 	100 count future 
+; 	110 count -
+; 	101 count _
+; 	111 count SPACE
+;------------------------------------------------------------------------
+
+UNPACK_DECODE		PHA                     	;Save packed type (space or -)	                
+	                AND     #%00011111     		;Strip away type flag
+	                TAY                     	;to keep repeat counter
+	                PLA                     	;Find out what type it was	                	                             
+	                AND	#%11100000		;mask flags
+	                CMP	#%11100000
+	                BEQ	.SPACE
+	                CMP	#%11000000
+			BEQ	.DASH			;must be HDASH
+			;CMP	#%10100000
+			;BEQ	.HDASH
+			;RTS				;return z=0 must be %10000000			
+.HDASH			LDA	#'_'
+			RTS				;
+.SPACE			LDA     #' '            	;Expand a space
+			RTS
+.DASH			LDA	#DASH
+			RTS
 
 ;------------------------------------------------------------------------
 ; Assemble command
@@ -2092,7 +2128,7 @@ ASSEMBLE        	JSR     SET_BOF         	;Start at begin of program
 	                STY     UNDEF           	;Clear undefined label flag
 	                STY     FORWARD         	;and forward ref. label flag
 	                STY     ERROR           	;Clear error number
-	                JSR     UNPACK          	;Unpack this line to IN
+	                JSR     UNPACK_IN          	;Unpack this line to IN
 	
 	                LDX     #0
 	                LDA     IN              	;Can it be a label?
@@ -3095,15 +3131,20 @@ CMD_SHOWREG		CLD				;debugging
 			LDY	#00
 			JSR	GOTOXY	
 			JSR	STRING
-		.ASCII " _____ _____ _____ _____ _____                    ",CR,LF
-		.ASCIS "|_   _| __  |  _  |     |   __|  AC="
+			
+			;packed 
+			
+			.DB	$a1,$a5,$a1,$a5,$a1,$a5,$a1,$a5,$a1,$a5,$b4,CR,LF,$7c,$a1,$a3			
+			.DB	$a1,$7c,$a1,$a2,$a2,$7c,$a2,$a1,$a2,$7c,$a5,$7c,$a3,$a2,$7c,$a2
+			.db	$41,$43,$3d,EOS
+			
 			
 			LDA	SAVA 
         		JSR     WR2HEX     		;Accumulator        		
         		JSR     WRSPACE        		
         		
         		JSR	STRING
-        	.ASCIS 	"  SP="        		
+        	.ASCII 	"  SP=",EOS
         		LDA	SAVS
         		JSR     WR2HEX     		;Stack Pointer
         		JSR     WRSPACE
@@ -3111,15 +3152,16 @@ CMD_SHOWREG		CLD				;debugging
 			        		
         		JSR	STRING
 		.ASCII CR,LF
-		.ASCIS "  | | |    -|     |   --|   __|  XR="
-        		
+		.ASCII "  | | |    -|     |   --|   __|  XR=",EOS
+		
+		        		
         		LDA	SAVX 
         		JSR     WR2HEX     		;X Reg        		
         		JSR     WRSPACE        		
         		
         		JSR     STRING	        
-	        .ASCII   "  NV*B.DIZC",CR,LF
-	        .ASCIS "  |_| |__|__|__|__|_____|_____|  YR="
+	        .ASCII "  NV*B.DIZC",CR,LF
+	        .ASCII "  |_| |__|__|__|__|_____|_____|  YR=",EOS
 	        	
         		LDA	SAVY 
         		JSR     WR2HEX     		;Y Reg
@@ -3221,28 +3263,63 @@ INITDATA_END		.WORD	NMI_RETURN		;User NMI vector
 ;Display help screen
 ;------------------------------------------------------------------------------------------
 CMD_HLP 		JSR     STRING            	
-		.ASCII CR,"  _______  _______  _____    ______  __ ",CR,LF 		                         
-		.ASCII " |   |   ||    ___||     |  |   __ \|  |",CR,LF 		 	
-		.ASCII " |       ||    ___||     |_ |    __/|__|           @  User defined command",CR,LF                          
-		.ASCII " |___|___||_______||_______||___|   |__|           A  Auto line numbering",CR,LF 
-		.ASCII "                                                   B  Break command",CR,LF                
-		.ASCII "   EXPANSION PORT LOW     EXPANSION PORT TOP       C  Copy command",CR,LF                      
-		.ASCII "  +-------------------+  +-------------------+     D  Dissassembler",CR,LF                  
-		.ASCII "  |[]GND         +5V[]|  |[]PA0         IRQ[]|     I  ASCII Dump",CR,LF     
-		.ASCII "  |[]A12         +5V[]|  |[]PA1         NMI[]|     L  List command",CR,LF                        
-		.ASCII "  |[]A7           NC[]|  |[]PA2         R/W[]|     M  Memory Dump",CR,LF                     
-		.ASCII "  |[]A6           A8[]|  |[]PA3          02[]|     N  New command",CR,LF                     
-		.ASCII "  |[]A5           A9[]|  |[]PA4         CA1[]|     O  Old command",CR,LF                   
-		.ASCII "  |[]A4          A11[]|  |[]PA5         PB5[]|     R  Renumber command",CR,LF              
-		.ASCII "  |[]A3          GND[]|  |[]PA6         PB6[]|     S  Start assembling",CR,LF                   
-		.ASCII "  |[]A2          A10[]|  |[]PA7         PB7[]|     T  Trace code",CR,LF                       
-		.ASCII "  |[]A1           CS[]|  +-------------------+     V  Value command",CR,LF                  
-		.ASCII "  |[]A0           D7[]|                            G  Go command",CR,LF                    
-		.ASCII "  |[]D0           D6[]|   HARDWARE MAPPING         Y  Memory configuraion",CR,LF 
-		.ASCII "  |[]D1           D5[]|                            E  Erase line",CR,LF                    
-		.ASCII "  |[]D2           D4[]|    CS   $2000              Z  Clear Screen",CR,LF                                                                                       
-		.ASCII "  |[]GND          D3[]|    VIA  $4000              W  Display Register",CR,LF                                              
-		.ASCII "  +-------------------+    ACIA $6000              F  Fill Memory",CR,LF + $80
+	
+		;Code packed saving 30% of bytes 324 bytes reduced
+		
+			.DB	$0d,$e2,$a7,$e2,$a7,$e2,$a5,$e4,$a6,$e2,$a2,$e1,$0d,$0a,$e1,$7c
+			.DB	$e3,$7c,$e3,$7c,$7c,$e4,$a3,$7c,$7c,$e5,$7c,$e2,$7c,$e3,$a2,$e1
+			.DB	$5c,$7c,$e2,$7c,$0d,$0a,$e1,$7c,$e7,$7c,$7c,$e4,$a3,$7c,$7c,$e5
+			.DB	$7c,$a1,$e1,$7c,$e4,$a2,$2f,$7c,$a2,$7c,$eb,$40,$e2,$55,$73,$65
+			.DB	$72,$e1,$64,$65,$66,$69,$6e,$65,$64,$e1,$63,$6f,$6d,$6d,$61,$6e
+			.DB	$64,$0d,$0a,$e1,$7c,$a3,$7c,$a3,$7c,$7c,$a7,$7c,$7c,$a7,$7c,$7c
+			.DB	$a3,$7c,$e3,$7c,$a2,$7c,$eb,$41,$e2,$41,$75,$74,$6f,$e1,$6c,$69
+			.DB	$6e,$65,$e1,$6e,$75,$6d,$62,$65,$72,$69,$6e,$67,$0d,$0a,$ff,$f4,$42
+			.DB	$e2,$42,$72,$65,$61,$6b,$e1,$63,$6f,$6d,$6d,$61,$6e,$64,$0d,$0a
+			.DB	$e3,$45,$58,$50,$41,$4e,$53,$49,$4f,$4e,$e1,$50,$4f,$52,$54,$e1
+			.DB	$4c,$4f,$57,$e5,$45,$58,$50,$41,$4e,$53,$49,$4f,$4e,$e1,$50,$4f
+			.DB	$52,$54,$e1,$54,$4f,$50,$e7,$43,$e2,$43,$6f,$70,$79,$e1,$63,$6f
+			.DB	$6d,$6d,$61,$6e,$64,$0d,$0a,$e2,$2b,$b3,$2b,$e2,$2b,$b3,$2b,$e5
+			.DB	$44,$e2,$44,$69,$73,$73,$61,$73,$73,$65,$6d,$62,$6c,$65,$72,$0d
+			.DB	$0a,$e2,$7c,$5b,$5d,$47,$4e,$44,$e9,$2b,$35,$56,$5b,$5d,$7c,$e2
+			.DB	$7c,$5b,$5d,$50,$41,$30,$e9,$49,$52,$51,$5b,$5d,$7c,$e5,$49,$e2
+			.DB	$41,$53,$43,$49,$49,$e1,$44,$75,$6d,$70,$0d,$0a,$e2,$7c,$5b,$5d
+			.DB	$41,$31,$32,$e9,$2b,$35,$56,$5b,$5d,$7c,$e2,$7c,$5b,$5d,$50,$41
+			.DB	$31,$e9,$4e,$4d,$49,$5b,$5d,$7c,$e5,$4c,$e2,$4c,$69,$73,$74,$e1
+			.DB	$63,$6f,$6d,$6d,$61,$6e,$64,$0d,$0a,$e2,$7c,$5b,$5d,$41,$37,$eb
+			.DB	$4e,$43,$5b,$5d,$7c,$e2,$7c,$5b,$5d,$50,$41,$32,$e9,$52,$2f,$57
+			.DB	$5b,$5d,$7c,$e5,$4d,$e2,$4d,$65,$6d,$6f,$72,$79,$e1,$63,$6f,$6d
+			.DB	$6d,$61,$6e,$64,$0d,$0a,$e2,$7c,$5b,$5d,$41,$36,$eb,$41,$38,$5b
+			.DB	$5d,$7c,$e2,$7c,$5b,$5d,$50,$41,$33,$ea,$30,$32,$5b,$5d,$7c,$e5
+			.DB	$4e,$e2,$4e,$65,$77,$e1,$63,$6f,$6d,$6d,$61,$6e,$64,$0d,$0a,$e2
+			.DB	$7c,$5b,$5d,$41,$35,$eb,$41,$39,$5b,$5d,$7c,$e2,$7c,$5b,$5d,$50
+			.DB	$41,$34,$e9,$43,$41,$31,$5b,$5d,$7c,$e5,$4f,$e2,$4f,$6c,$64,$e1
+			.DB	$63,$6f,$6d,$6d,$61,$6e,$64,$0d,$0a,$e2,$7c,$5b,$5d,$41,$34,$ea
+			.DB	$41,$31,$31,$5b,$5d,$7c,$e2,$7c,$5b,$5d,$50,$41,$35,$e9,$50,$42
+			.DB	$35,$5b,$5d,$7c,$e5,$52,$e2,$52,$65,$6e,$75,$6d,$62,$65,$72,$e1
+			.DB	$63,$6f,$6d,$6d,$61,$6e,$64,$0d,$0a,$e2,$7c,$5b,$5d,$41,$33,$ea
+			.DB	$47,$4e,$44,$5b,$5d,$7c,$e2,$7c,$5b,$5d,$50,$41,$36,$e9,$50,$42
+			.DB	$36,$5b,$5d,$7c,$e5,$53,$e2,$53,$74,$61,$72,$74,$e1,$61,$73,$73
+			.DB	$65,$6d,$62,$6c,$69,$6e,$67,$0d,$0a,$e2,$7c,$5b,$5d,$41,$32,$ea
+			.DB	$41,$31,$30,$5b,$5d,$7c,$e2,$7c,$5b,$5d,$50,$41,$37,$e9,$50,$42
+			.DB	$37,$5b,$5d,$7c,$e5,$54,$e2,$54,$72,$61,$63,$65,$e1,$63,$6f,$64
+			.DB	$65,$0d,$0a,$e2,$7c,$5b,$5d,$41,$31,$eb,$43,$53,$5b,$5d,$7c,$e2
+			.DB	$2b,$b3,$2b,$e5,$56,$e2,$56,$61,$6c,$75,$65,$e1,$63,$6f,$6d,$6d
+			.DB	$61,$6e,$64,$0d,$0a,$e2,$7c,$5b,$5d,$41,$30,$eb,$44,$37,$5b,$5d
+			.DB	$7c,$fc,$47,$e2,$47,$6f,$e1,$63,$6f,$6d,$6d,$61,$6e,$64,$0d,$0a
+			.DB	$e2,$7c,$5b,$5d,$44,$30,$eb,$44,$36,$5b,$5d,$7c,$e3,$48,$41,$52
+			.DB	$44,$57,$41,$52,$45,$e1,$4d,$41,$50,$50,$49,$4e,$47,$e9,$59,$e2
+			.DB	$4d,$65,$6d,$6f,$72,$79,$e1,$63,$6f,$6e,$66,$69,$67,$75,$72,$61
+			.DB	$69,$6f,$6e,$0d,$0a,$e2,$7c,$5b,$5d,$44,$31,$eb,$44,$35,$5b,$5d
+			.DB	$7c,$fc,$45,$e2,$45,$72,$61,$73,$65,$e1,$6c,$69,$6e,$65,$0d,$0a
+			.DB	$e2,$7c,$5b,$5d,$44,$32,$eb,$44,$34,$5b,$5d,$7c,$e4,$43,$53,$e3
+			.DB	$24,$32,$30,$30,$30,$ee,$5a,$e2,$43,$6c,$65,$61,$72,$e1,$53,$63
+			.DB	$72,$65,$65,$6e,$0d,$0a,$e2,$7c,$5b,$5d,$47,$4e,$44,$ea,$44,$33
+			.DB	$5b,$5d,$7c,$e4,$56,$49,$41,$e2,$24,$34,$30,$30,$30,$ee,$57,$e2
+			.DB	$44,$69,$73,$70,$6c,$61,$79,$e1,$52,$65,$67,$69,$73,$74,$65,$72
+			.DB	$0d,$0a,$e2,$2b,$b3,$2b,$e4,$41,$43,$49,$41,$e1,$24,$36,$30,$30
+			.DB	$30,$0d,$0a,EOS
+		
+		
 USERKEYDEF_RETURN	RTS
 
 ;------------------------------------------------------------------------------------------
