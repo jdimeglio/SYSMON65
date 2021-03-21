@@ -3,7 +3,7 @@
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
-; "Programmed" by Joe DiMeglio
+; Programmed by Joe DiMeglio
 ; https://github.com/jdimeglio/6502-Monitor
 
 			.OPT proc65C02,swapbin		;Michal Kowaski Simulator
