@@ -146,17 +146,16 @@ KBDCR           = io_getc 	        	;Keyboard control register
 
 ;------------------------------------------------------------------------
 ; Start Here
-; 100c cccc Spare
-; 110c cccc DASH  
-; 101c cccc HDASH
-; 111c cccc space
+; 100c cccc Space
+; 110c cccc DELIM
+; 101c cccc OTHER
 ; 
 ;---------------------------------------------------------------------
 			*= $1000
 START		
-			lda	#<help	;klocation for text area to pack
+			lda	#<trace	;klocation for text area to pack
 			sta	SRCE
-			lda	#>help
+			lda	#>trace
 			STA	SRCE +1
 			
 			
@@ -165,31 +164,43 @@ START
 			LDA	#$20
 			STA	DEST+1		;$2000 location to store	
 
+
+
 ;---------------------------------------------------------------------
 PACK1			LDY	#0			
 .LOOP           	LDA	(SRCE),y						
 			BEQ	.eol		;ends with a ZERO
+						
+
+
 			CMP	#SP
 			beq	.pack
 			CMP     #DASH 
 			BEQ	.pack	
 			CMP	#'_'		
 			BEQ	.pack
-			JSR	BUMPSOURCE					
+
+			JSR	BUMPSOURCE		
+			
 .WRITE          	STA     (DEST),Y      	;Save normal character
-	                JSR	BUMPDEST	                
+	                JSR	BUMPDEST
+	                
 	                BRA     .LOOP          	;Always taken!
+
 .pack           	STA     DELIM           ;Save character to pack
                		LDA     #1              ;Init repetition counter
                 	STA     COUNT
+
 .PCKLOOP        	JSR	BUMPSOURCE     	;Count number of same characters
                 	LDA     (SRCE),y
 	                CMP     DELIM
 	                BNE     .PCKEXIT        ;It's not the same anymore!
 	                INC     COUNT           ;Increment counter
-	                LDA     COUNT           ;Don't allow it to exceed 31 (5 bits only)
+	                LDA     COUNT           ;Don't allow it to exceed 63
 	                CMP     #31
 	                BCC     .PCKLOOP   	;Still OK!
+			NOP
+			
 	                JSR	BUMPSOURCE      ;Compensate for normal exit
 .PCKEXIT        	LDA     DELIM           ;Was it space or dash?
 	                CMP     #' '            ;  (Makes A=0 if it is space                
@@ -197,13 +208,22 @@ PACK1			LDY	#0
 	                CMP	#DASH
 	                BEQ	.DASH
 	                LDA     #%10100000      ;Set _ flag
-			BRA	.ADDCOUNT			
-.DASH			LDA	#%11000000	;Set dash flag
 			BRA	.ADDCOUNT
+			
+.DASH			LDA	#%10100000	;Set dash flag
+			BRA	.ADDCOUNT
+
 .SPACE          	LDA	#%11100000
 .ADDCOUNT		ORA     COUNT          	;Combine with counter			
 	                BRA     .WRITE          				
 .eol			RTS
+
+
+
+
+
+
+
 
 ;-----------------------------------------------------------------------------		
 		
@@ -221,9 +241,9 @@ BUMPDEST		INC	DEST
 		
 ;-----------------------------------------------------------------------------			
 		
-		
-
-
+trace		
+	.ASCII " _______ ______ _______ ______ _______                   ",CR,LF
+		.ASCII "|_     _|   __ |   _   |      |    ___|  AC=",EOS
 
 	
 ;	.ASCII " _____ __ __ _____ _____ _____ _____ ___ ___ ",CR,LF

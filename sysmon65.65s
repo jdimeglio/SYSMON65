@@ -1801,13 +1801,13 @@ ADDLINE         	JSR     GET_VAL         	;Get line number eg: 1000
 	                CMP     DELIM
 	                BNE     .PCKEXIT        	;It's not the same anymore!
 	                INC     COUNT           	;Increment counter
-	                LDA     COUNT           	;Don't allow it to exceed 63
-	                CMP     #63
+	                LDA     COUNT           	;Don't allow it to exceed 31
+	                CMP     #31
 	                BCC     .PCKLOOP        	;Still OK!
 	                INX                     	;Compensate for normal exit
 .PCKEXIT        	DEX                     	;We're too far now
                 	LDA     DELIM           	;Was it space or dash?
-	                CMP     #' '            	;                  
+	                CMP     #SP           	;                  
 	                BEQ     .SPACE          	;It was space!	                
 	                CMP	#DASH
 	                BEQ	.DASH	                
@@ -1817,8 +1817,7 @@ ADDLINE         	JSR     GET_VAL         	;Get line number eg: 1000
 .DASH	                LDA     #%11000000      	;Set dash flag
 			.DB $2C				;Skip two bytes
 			;BRA	.ADDCOUNT
-.SPACE          	LDA	#%11100000      	;Set dash flag
-			.DB $2C				;Skip two bytes
+.SPACE          	LDA	#%11100000      	;Set dash flag			
 .ADDCOUNT		ORA     COUNT           	;Combine with counter			
 	                BRA     .WRITE          	;Always taken!
 
@@ -3135,44 +3134,46 @@ CMD_SHOWREG		CLD				;debugging
 			JSR	GOTOXY	
 			JSR	STRING
 			
-			;packed 
+			;.ASCII " _______ ______ _______ ______ _______                   ",CR,LF
+			;.ASCII "|_     _|   __ |   _   |      |    ___|  AC=",EOS
+		
 			
-			.DB	$a1,$a5,$a1,$a5,$a1,$a5,$a1,$a5,$a1,$a5,$b4,CR,LF,$7c,$a1,$a3			
-			.DB	$a1,$7c,$a1,$a2,$a2,$7c,$a2,$a1,$a2,$7c,$a5,$7c,$a3,$a2,$7c,$a2
-			.db	$41,$43,$3d,EOS
+			;packed 					
+	 	
+			.DB	$e1,$a7,$e1,$a6,$e1,$a7,$e1,$a6,$e1,$a7,$f3,$0d,$0a,$7c,$a1,$e5
+			.DB	$a1,$7c,$e3,$a2,$e1,$7c,$e3,$a1,$e3,$7c,$e6,$7c,$e4,$a3,$7c,$e2			
+			.DB	$41,$43,$3d,$00
 			
 			
 			LDA	SAVA 
         		JSR     WR2HEX     		;Accumulator        		
-        		JSR     WRSPACE        		
+        		;JSR     WRSPACE        		
         		
         		JSR	STRING
-        	.ASCII 	"  SP=",EOS
+        	.ASCII 	"   SP=",EOS
         		LDA	SAVS
         		JSR     WR2HEX     		;Stack Pointer
-        		JSR     WRSPACE
+        		;JSR     WRSPACE
 		
 			        		
         		JSR	STRING
 		.ASCII CR,LF
-		.ASCII "  | | |    -|     |   --|   __|  XR=",EOS
+		.ASCII "  |   | |      |       |   ---|    ___|  XR=",EOS
 		
 		        		
         		LDA	SAVX 
         		JSR     WR2HEX     		;X Reg        		
-        		JSR     WRSPACE        		
+        		;JSR     WRSPACE        		
         		
         		JSR     STRING	        
-	        .ASCII "  NV*B.DIZC",CR,LF
-	        .ASCII "  |_| |__|__|__|__|_____|_____|  YR=",EOS
+	        .ASCII "   NV*B.DIZC",CR,LF
+	        .ASCII "  |___| |___|__|___|___|______|_______|  YR=",EOS
 	        	
         		LDA	SAVY 
         		JSR     WR2HEX     		;Y Reg
-        		JSR     WRSPACE        		
-        	
+        		JSR     WRSPACE        		        	
         		JSR	WRSPACE
-        		JSR	WRSPACE
-        		
+        		JSR	WRSPACE        		
         		LDA	SAVP
         		JSR	WRBIN			;Flags       	        	
         		JSR	DRAWLINE
@@ -3186,6 +3187,7 @@ CMD_SHOWREG		CLD				;debugging
         		RTS        			;Start of code	
         	
 ;------------------------------------------------------------------------------------------
+
 RESET_VECTOR   		SEI				;Hardware reset routine
 			LDA	USRRST			;Check what vector to use
 			EOR	#$A5
