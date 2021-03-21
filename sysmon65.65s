@@ -648,7 +648,7 @@ PRINT_SRCE     		LDA     (SRCE),Y       		;Get character (also GLobal Print)
 ; Error Messages - TODO
 ;------------------------------------------------------------------------
 
-TEXT			.ASCII    	" ERROR",CR,LF + $80                	                
+TEXT			.ASCII    	" ERROR",CR,LF,EOS               	                
 PNTR_ERR_SYN		.ASCIS    	" :SYNTAX"        			;Syntax error
 PNTR_ERR_LBL 		.ASCIS    	" :LABEL"         			;Label error / no global 
 PNTR_ERR_RNG    	.ASCIS     	" :INVALID RANGE"          		;Range error
@@ -664,7 +664,7 @@ PNTR_ERR_WRT    	.ASCIS     	" :UNABLE TO WRITE/READ"          	;Read/Write Erro
 
 TEXT1        		.ASCIS     	"--------------------------"
 PNTR_AUTOTEXT		.ASCIS		"AUTONUM ENABLE starting "
-PNTR_ERRORS     	.ASCII     	" COMPILE ERROR(s)",CR,LF + $80
+PNTR_ERRORS     	.ASCII     	" COMPILE ERROR(s)",CR,LF,EOS
 PNTR_CANCEL     	.ASCIS     	"/"		
 PNTR_CODE_ORG  		.ASCIS     	".ORG ->"
 

@@ -1,5 +1,5 @@
 ; LIBRARY FILE
-; version 2.09
+; version 2.10
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
@@ -36,7 +36,7 @@ NEXTRECORD 		JSR 	RDCHAR
         		
 PROTOCOLERROR 		JSR 	WRCHAR
         		JSR     STRING        		
-        		.ASCII    BELL,CR,LF," :PROTOCOL ERROR",CR,LF + $80
+        		.ASCII    BELL,CR,LF," :PROTOCOL ERROR",CR,LF,EOS
         		JMP     TERMINATE        		
 
 CONTINUE 		JSR    	READ_DATA		;read rcord length with checksum add
@@ -53,7 +53,7 @@ CONTINUE 		JSR    	READ_DATA		;read rcord length with checksum add
         		JMP     .END_RECORD        		
 
 .INVREC  		JSR     STRING
-        		.ASCII    BELL,CR,LF," :INVALID RECORD TYPE",CR,LF +$80
+        		.ASCII    BELL,CR,LF," :INVALID RECORD TYPE",CR,LF,EOS
         		JMP     TERMINATE
         		
 
@@ -94,7 +94,7 @@ CONTINUE 		JSR    	READ_DATA		;read rcord length with checksum add
 
 .WRITEERROR 		JSR  	STRING
         		.ASCII   BELL,CR,LF
-			.ASCIS   " :CANNOT WRITE AT ADDRESS $"
+			.ASCII   " :CANNOT WRITE AT ADDRESS $",EOS
 
         		LDA	SRCE+1        		
         		JSR	WR2HEX        		
@@ -104,7 +104,7 @@ CONTINUE 		JSR    	READ_DATA		;read rcord length with checksum add
         		BRA     TERMINATE	
 
 .CHECKSUMERR        	JSR     STRING
-        		.ASCII    BELL,LF,CR," :CHECK SUM ERROR",LF,CR  +$80       		
+        		.ASCII    BELL,LF,CR," :CHECK SUM ERROR",LF,CR,EOS
         		BRA     TERMINATE        		
         		
 .END_RECORD  		JSR    	RD2HEX			;last two byes the CheckSUM
@@ -113,10 +113,10 @@ CONTINUE 		JSR    	READ_DATA		;read rcord length with checksum add
 			BNE	.CHECKSUMERR				
         		JSR     STRING
         		.ASCII  BELL,CR,LF        		
-        		.ASCIS   " :INTEL-HEX SUCCESSFUL"        		
+        		.ASCII   " :INTEL-HEX SUCCESSFUL",EOS
         		JSR     STRING    		        		
         		.ASCII   CR,LF
-        		.ASCIS   " :TOTAL BYTES WRITTEN "			
+        		.ASCII   " :TOTAL BYTES WRITTEN ",EOS
 			LDY	DEC_SAVE
 			LDA	DEC_SAVE+1
 			JSR	WRDECI        	        		
@@ -160,6 +160,6 @@ READ_DATA 		JSR   	RD2HEX			;read two hex characters & checksum
 ;        		inx
 ;        		txs
 ;        		jsr     STRING     ;read error from RS232
-;        		.ASCIS   BELL,CR,LF," :READ ERROR FROM ACIA",CR,LF
+;        		.ASCIS   BELL,CR,LF," :READ ERROR FROM ACIA",CR,LF,EOS
 ;        		BRA     TERMINATE
         		        			
