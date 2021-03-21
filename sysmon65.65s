@@ -3,7 +3,7 @@
 ; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
-; Programmed by Joe DiMeglio
+; "Programmed" by Joe DiMeglio
 ; https://github.com/jdimeglio/6502-Monitor
 
 			.OPT proc65C02,swapbin		;Michal Kowaski Simulator
@@ -645,10 +645,10 @@ PRINT_SRCE     		LDA     (SRCE),Y       		;Get character (also GLobal Print)
                 	RTS
                 	
 ;------------------------------------------------------------------------
-; Error Messages - TODO
+; Error Messages - TODO - Can be impoved
 ;------------------------------------------------------------------------
 
-TEXT			.ASCII    	" ERROR",CR,LF,EOS               	                
+TEXT			.ASCII    	" ERROR",CR,LF + $80                	                
 PNTR_ERR_SYN		.ASCIS    	" :SYNTAX"        			;Syntax error
 PNTR_ERR_LBL 		.ASCIS    	" :LABEL"         			;Label error / no global 
 PNTR_ERR_RNG    	.ASCIS     	" :INVALID RANGE"          		;Range error
@@ -662,9 +662,9 @@ PNTR_ERR_MNE    	.ASCIS     	" :MNEMONIC "          			;Mnemonic error
 PNTR_ERR_EXT    	.ASCIS     	" :EXTRAT DEFINATION"          		;Extra definition error
 PNTR_ERR_WRT    	.ASCIS     	" :UNABLE TO WRITE/READ"          	;Read/Write Error
 
-TEXT1        		.ASCIS     	"--------------------------"
-PNTR_AUTOTEXT		.ASCIS		"AUTONUM ENABLE starting "
-PNTR_ERRORS     	.ASCII     	" COMPILE ERROR(s)",CR,LF,EOS
+       		
+TEXT1 			.ASCIS		"AUTONUM ENABLE starting "
+PNTR_ERRORS     	.ASCII     	" COMPILE ERROR(s)",CR,LF + $80
 PNTR_CANCEL     	.ASCIS     	"/"		
 PNTR_CODE_ORG  		.ASCIS     	".ORG ->"
 
@@ -684,7 +684,7 @@ ERR_WRT		=	PNTR_ERR_WRT - TEXT
 
 ;standard messages
 
-AUTOTEXT	=	PNTR_AUTOTEXT  - TEXT1
+AUTOTEXT	=	0
 STR_ERRORS      =     	PNTR_ERRORS  - TEXT1	
 STR_CANCEL      =     	PNTR_CANCEL  - TEXT1
 CODE_ORG	=	PNTR_CODE_ORG  - TEXT1
@@ -1812,10 +1812,13 @@ ADDLINE         	JSR     GET_VAL         	;Get line number eg: 1000
 	                CMP	#DASH
 	                BEQ	.DASH	                
 			LDA	#%10100000		;Set dash flag
-			BRA	.ADDCOUNT
+			.DB $2C				;Skip two bytes			
+			;BRA	.ADDCOUNT			
 .DASH	                LDA     #%11000000      	;Set dash flag
-			BRA	.ADDCOUNT
+			.DB $2C				;Skip two bytes
+			;BRA	.ADDCOUNT
 .SPACE          	LDA	#%11100000      	;Set dash flag
+			.DB $2C				;Skip two bytes
 .ADDCOUNT		ORA     COUNT           	;Combine with counter			
 	                BRA     .WRITE          	;Always taken!
 
@@ -2055,9 +2058,9 @@ UNPACK_DECODE		PHA                     	;Save packed type (space or -)
 	                CMP	#%11100000
 	                BEQ	.SPACE
 	                CMP	#%11000000
-			BEQ	.DASH			;else must be HDASH
-;			CMP	#%10100000
-;			BEQ	.HDASH
+			BEQ	.DASH			;must be HDASH
+			;CMP	#%10100000
+			;BEQ	.HDASH
 			;RTS				;return z=0 must be %10000000			
 .HDASH			LDA	#'_'
 			RTS				;
@@ -2358,12 +2361,12 @@ DIR_EQ          	LDA     PASS            	;What pass are we in?
 .RTS            	RTS
 
 NOLABEL         	LDA     #ERR_LBL        	;Exit with label EERROR		
-               	 	STA     ERROR
-DIR_EXIT2       	RTS
-
+			.db	$2c			;Skip next two bytes BIT 
+               	 	;STA     ERROR
+       			;RTS
 UNDEF_ERROR     	LDA     #ERR_DEF        	;Exit with undefined label ERROR
-                	STA     ERROR
-                	RTS
+	            	STA     ERROR
+DIR_EXIT2              	RTS
 
 ;------------------------------------------------------------------------
 ; .OR directive
