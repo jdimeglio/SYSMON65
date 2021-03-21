@@ -2055,9 +2055,9 @@ UNPACK_DECODE		PHA                     	;Save packed type (space or -)
 	                CMP	#%11100000
 	                BEQ	.SPACE
 	                CMP	#%11000000
-			BEQ	.DASH			;must be HDASH
-			;CMP	#%10100000
-			;BEQ	.HDASH
+			BEQ	.DASH			;else must be HDASH
+;			CMP	#%10100000
+;			BEQ	.HDASH
 			;RTS				;return z=0 must be %10000000			
 .HDASH			LDA	#'_'
 			RTS				;
