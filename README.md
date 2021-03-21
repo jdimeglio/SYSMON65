@@ -1,4 +1,4 @@
-
+﻿
 
 
 
@@ -26,4 +26,4 @@ The look and feel of *SYSMON65* was heavily influenced by the famous line-orient
 
 *SYSMON65* includes a full 2-pass assembler with local and global labels, directives, and more. A 65C02 disassembler is included which includes step-by-step debugging (aka Tracing), memory dumps, ASCII dumps, fill, delete, block move, intel hex loader and more.
 
-*SYSMON65* has been tested on hardware running a N65C02 processor. It also includes code for an LCD 16x2 module. The software currently takes just over 3.2KB of memory space.
+*SYSMON65* has been tested on hardware running a N65C02 processor. It also includes code for an LCD 16x2 module. The software currently takes just over 7.2KB of memory space.
