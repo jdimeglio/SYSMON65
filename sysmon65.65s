@@ -45,12 +45,12 @@ ROM_LIBRRAY			=	1						;adds ROM library to assembler
 
 COLD            	JSR     INIT            	;Initialise assembler
 WARM            	CLD                     	;WARM Reboot/startup
-			LDX	#$FF			;just in case	
-			TXS
+                    LDX		#$FF				;just in case	
+                    TXS
                 	JSR     WRCRLF          	;Print CR & LF before we do anything                
-                	LDA	COLD+1			
+                	LDA		COLD+1			
                 	PHA
-                	LDA	COLD
+                	LDA		COLD
                 	PHA		
                 	
                 	STZ     AUTO_FLAG       	;Clear auto flag
