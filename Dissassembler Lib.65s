@@ -1,17 +1,25 @@
-; LIBRARY FILE
-; version 2.09
-; two pass assembler, dissembler and tracer- inspiration with permission from A1 by San Bergmans
+; LIBRARY FILE DISSESSEMBER.65S
+; version 2.20
+; two pass symbolic assembler, dissembler and tracer
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
-; "Programmed" by Joe DiMeglio
+; Programmed by Joe DiMeglio
+; https://github.com/jdimeglio/6502-Monitor
+; bug fixes
 		 
 
 ;------------------------------------------------------------------------
 ; Decode mnemonic and operand
 ;------------------------------------------------------------------------
 
-MNEMON         		JSR	CMPMNE			;AC = has left MNE :THEN FND INDEX AND SAVE IT IN	
-			JSR	CALCAM			;Calculate addres 		
+MNEMON         		JSR		CMPMNE				;AC = has left MNE :THEN FND INDEX AND SAVE IT IN	
+					;LDA	CURMNE 						
+					;CMP	#FAIL				;Check MNEMONIC error
+					;BNE	.MNE_ERR					
+					;LDA	#ERR_MNE
+					;STA	ERROR
+					;BRA	.MNE_ERR 					
+					JSR		CALCAM				;Calculate addres 
 .MNE_ERR        	RTS
 
 ;------------------------------------------------------------------------
@@ -19,42 +27,42 @@ MNEMON         		JSR	CMPMNE			;AC = has left MNE :THEN FND INDEX AND SAVE IT IN
 ; X points to the index in the keyboard IN
 ;------------------------------------------------------------------------
 
-CMPMNE			PHX				;save X index to keyboard buffer
-			CLC				;AC = has left MNE
-			ROR 	PARM1						
-			TXA
-			CLC
-			ADC	#IN			;Calc IN address + X
-			STA	SRCE
-			STZ	SRCE+1			;*** Could be removed if ZP load
-			LDY 	#$02			;Three letters
-.NEXT2			SEC
-			LDA     (SRCE),Y 		;get the letters SHOULD BE ZERO Page load
-			SBC 	#'A'-1
-			LDX 	#$05			;shift
-.NEXTROT		LSR
-			ROR 	PARM1
-			ROR 	PARM1+1
-			DEX
-			BNE 	.NEXTROT
-			DEY
-			BPL 	.NEXT2			;Nemonic now compressed		
-			LDX 	#NUMMN			;Number of mnemonics to search through
-.LOOP			LDA 	LMNETB-1,X		;search 
-			CMP 	PARM1
-			BNE 	.NXT
-			LDA 	RMNETB-1,X
-			CMP 	PARM1+1
-			BEQ 	.FND
-.NXT			DEX
-			BNE 	.LOOP
-.FND			DEX				;X = $FF for failure
-			STX	CURMNE 
-			PLX				;restore X 
-			INX
-			INX
-			INX				;Adjust the buffer index to point to next Char
-			RTS		
+CMPMNE				PHX						;save X index to keyboard buffer
+					CLC						;AC = has left MNE
+					ROR 	PARM1						
+					TXA
+					CLC
+					ADC		#IN				;Calc IN address + X
+					STA		SRCE
+					STZ		SRCE+1			;*** Could be removed if ZP load
+					LDY 	#$02			;Three letters
+.NEXT2				SEC
+					LDA     (SRCE),Y 		;get the letters SHOULD BE ZERO Page load
+					SBC 	#'A'-1
+					LDX 	#$05			;shift
+.NEXTROT			LSR
+					ROR 	PARM1
+					ROR 	PARM1+1
+					DEX
+					BNE 	.NEXTROT
+					DEY
+					BPL 	.NEXT2			;Nemonic now compressed		
+					LDX 	#NUMMN			;Number of mnemonics to search through
+.LOOP				LDA 	LMNETB-1,X		;search 
+					CMP 	PARM1
+					BNE 	.NXT
+					LDA 	RMNETB-1,X
+					CMP 	PARM1+1
+					BEQ 	.FND
+.NXT				DEX
+					BNE 	.LOOP
+.FND				DEX						;X = $FF for failure
+					STX		CURMNE 
+					PLX						;restore X 
+					INX
+					INX
+					INX						;Adjust the buffer index to point to next Char
+					RTS		
 
 ;.ERR		LDA	#01
 		;STA	ERROR		
@@ -68,69 +76,401 @@ CMPMNE			PHX				;save X index to keyboard buffer
 ; calculate the object code, and update PC
 ;------------------------------------------------------------------------
 
-MKOBJC			LDY 	CURMNE			;Index to the table
-			LDA 	BASE,Y			;get base value for current mnemonic
-			LDX 	CURADM			;ADdress mode
-			CLC
-			ADC 	OFFSET,X		;add in the offset	
-.NOSTZ			CPX 	#ABY			;handle exceptions
-			BEQ 	.CHABY
-			CPX 	#IMM
-			BNE 	.CONT
-			CPY 	#$22			;check if BIT first
-			BNE 	.NOBIT
-			ADC 	#ADJBIT
-.NOBIT			CPY 	#$28			;immediate mode need to adjust a range
-			BMI 	.CONT
-			CPY 	#$2F+1
-			BCS 	.CONT
-			ADC 	#ADJIMM			;carry is clear
-		;	BNE .CONT	
-.CHABY			CPY 	#$35			;LDX check
-			BNE 	.CONT
-			CLC
-			ADC 	#ADJABY
-.CONT			CPY 	#$23			;STZ needs special handling
-			BNE 	.DONE
-			CPX 	#ABS
-			BMI 	.DONE
-			BEQ 	.SKIP
-			ADC 	#$1-$10			;carry is set
-.SKIP			ADC 	#$30-1			;carry is set
-.DONE			JSR 	SAVE_OBJ		;we have the object code
+MKOBJC				LDY 	CURMNE			;Index to the table
+					LDA 	BASE,Y			;get base value for current mnemonic
+					LDX 	CURADM			;ADdress mode
+					CLC
+					ADC 	OFFSET,X		;add in the offset	
+.NOSTZ				CPX 	#ABY			;handle exceptions
+					BEQ 	.CHABY
+					CPX 	#IMM
+					BNE 	.CONT
+					CPY 	#$22			;check if BIT first
+					BNE 	.NOBIT
+					ADC 	#ADJBIT
+.NOBIT				CPY 	#$28			;immediate mode need to adjust a range
+					BMI 	.CONT
+					CPY 	#$2F+1
+					BCS 	.CONT
+					ADC 	#ADJIMM			;carry is clear
+;					BNE 	.CONT	
+.CHABY				CPY 	#$35			;LDX check
+					BNE 	.CONT
+					CLC
+					ADC 	#ADJABY
+.CONT				CPY 	#$23			;STZ needs special handling
+					BNE 	.DONE
+					CPX 	#ABS
+					BMI 	.DONE
+					BEQ 	.SKIP
+					ADC 	#$1-$10			;carry is set
+.SKIP				ADC 	#$30-1			;carry is set
+.DONE				JSR 	SAVE_OBJ		;we have the object code
 
-		.IF 	BRKAS2				;if we want to add two BRK
-			CMP 	#$00
-			BNE 	.MKARG
-			JSR 	SAVE_OBJ		;
-		.ENDIF
+			.IF 	BRKAS2					;if we want to add two BRK
+					CMP 	#$00
+					BNE 	.MKARG
+					JSR 	SAVE_OBJ		;
+			.ENDIF
 
-.MKARG							;where appropriate, the arg value is in HEXVAL,H
-							;copy to ARGS and null terminate
-			TXA				;quick check for X=0
-			BEQ 	.DORTS			;IMP - no args
-			DEX
-			BEQ 	.DORTS			;ACC - no args		
-			LDA	HEXVAL
-			CPX 	#ABS-1			;word arg if X is greater than or equal to ABS
-			BMI 	.DOBYTE			;X < #ABS	
-.DOWORD			JSR 	SAVE_OBJ		;Save byte(s)
-			LDA 	HEXVAL+1
-.DOBYTE			JSR 	SAVE_OBJ
-			STZ	ERROR			;no
-.DORTS			RTS
+.MKARG										;where appropriate, the arg value is in HEXVAL,H
+											;copy to ARGS and null terminate
+					TXA						;quick check for X=0
+					BEQ 	.DORTS			;IMP - no args
+					DEX
+					BEQ 	.DORTS			;ACC - no args		
+					LDA		HEXVAL
+					CPX 	#ABS-1			;word arg if X is greater than or equal to ABS
+					BMI 	.DOBYTE			;X < #ABS	
+.DOWORD				JSR 	SAVE_OBJ		;Save byte(s)
+					LDA 	HEXVAL+1
+.DOBYTE				JSR 	SAVE_OBJ
+					STZ		ERROR			;no error really??
+.DORTS				RTS
 
 
 ;------------------------------------------------------------------------
 ; work out the addressing mode
 ;------------------------------------------------------------------------	
 
-CALCAM			; work out the addressing mode
-			JSR 	ADDMOD	
-			CPX 	#FAIL
-			BNE 	MKOBJC
-			;LDY 	#$FF	; Illegal address mode error
-			RTS
+CALCAM											; work out the addressing mode
+					JSR 	ADDMOD	
+					CPX 	#FAIL
+					BNE 	MKOBJC
+					;LDY 	#$FF	; Illegal address mode error
+					RTS
+
+
+
+;------------------------------------------------------------------------   
+;Find addressing MODE
+;SRCE = points top begining of NME in buffer
+;CURMNE = location of found NME
+;------------------------------------------------------------------------
+ADDMOD											;Check the arguments and work out the
+												;addressing mode
+												;return mode in X
+												;default error value for mode
+												;save it	
+												;Start checking the format...	
+		
+					LDY 	CURMNE				;Holds the current mne index
+					JSR		NNONSPC				;get next no space 				
+					STX     SAVE_Y          	;Save oprand address from keyboard buffer
+					BNE 	.NOTSP				;not end of line
+		
+.EOL				CPY 	#$12				;check exception first - JSR
+					BEQ		.RET
+					LDY 	#IMP				;implied mode - space
+					JSR 	CHKMOD				;check command is ok with this mode
+					CPY 	#FAIL				;not ok		
+					BEQ 	.NOTIMP				;may still be accumulator mode though
+.RET				RTS
+.NOTIMP 			LDY 	#ACC				;accumulator mode - space
+					JMP 	CHKMOD				;check command is ok with this mode			
+		
+.NOTSP				CMP 	#IMV				;immediate mode - '#'
+					BEQ 	.DOIMM				
+					LDY 	#REL
+					JSR 	CHKMOD				;check if command is a branch
+					CPY 	#FAIL
+					BEQ 	.NOTREL					
+					BRA 	DOREL				;Do relative Addressing
+	
+.DOIMM				TYA
+					LDY 	#IMM
+					CMP 	#$2C				;check exception first - STA
+					BEQ 	BAD			
+					CMP 	#$35				;check inclusion - LDX
+					BEQ 	.IMMOK
+					CMP 	#$22				;check inclusion - BIT
+					BEQ 	.IMMOK
+					
+					JSR 	CHKMOD				;check command is ok with this mode
+					CPY 	#FAIL
+					BEQ 	.RET
+		
+.IMMOK				STY		CURADM				;
+					LDX		SAVE_Y
+					INX							;Get next Charater 
+.GETVALUE			JSR		GET_EXPRES
+					RTS
+		
+.NOTREL 			;LDX	SAVE_Y				;save two bytes :-) 
+					LDA		IN,X				;check the more complicated modes
+					CMP 	#OPEN				;indirection?
+					BNE 	.CONT				;no
+					INX							;skip the '('
+.CONT				LDX		SAVE_Y				;restore the index
+					JSR 	FMT2AM				;calculate the addressing mode from the format
+					CPX 	#FAIL
+					BEQ 	.RET
+					STY 	CURADM
+
+;------------------------------------------------------------------------
+;			JMP CHKEXS
+; 			falls through
+
+;------------------------------------------------------------------------
+CHKEXS											;Current addressing mode is in X
+					CPY 	#ZPY				;for MNE indices 28 to 2F, ZPY is illegal
+					BNE 	.CONT				;but ABY is ok, so promote byte argument to word
+					LDY 	CURMNE
+					CPY 	#$28
+					BCC 	.CONT
+					CPY 	#$2F+1
+					BCS 	.CONT	
+					LDY 	#ABY				;updated addressing mode
+					BNE 	OK
+.CONT				LDX 	#SPCNT				;check special includes
+.LOOP				LDA 	SPINC1-1,X			;load mnemonic code
+					CMP 	CURMNE
+					BNE 	.NEXT
+					LDY 	SPINC2-1,X			;load addressing mode
+					CPY 	CURADM
+					BEQ 	OK					;match - so ok
+					LDY 	SPINC3-1,X			;load addressing mode
+					CPY 	CURADM
+					BEQ 	OK			;match - so ok
+.NEXT				DEX
+					BNE 	.LOOP
+					LDY 	CURADM
+
+;------------------------------------------------------------------------					
+;	BNE CHKMOD	; wasn't in the exceptions table - check normally
+; falls through
+; CHeck Adressing Mode
+;------------------------------------------------------------------------
+CHKMOD				LDA 	CURMNE				;always > 0
+					CMP 	MIN,y				;mode index in X
+					BCC 	BAD					;mnemonic < MIN
+					CMP 	MAX,y				;MAX,X holds actually MAX + 1
+					BCS 	BAD					;mnemonic > MAX
+OK					STY 	CURADM				;save mode		
+					RTS
+				
+;------------------------------------------------------------------------
+
+BAD					LDY 	#FAIL				;Illegal addressing mode error
+					STY		ERROR	
+					RTS
+
+;------------------------------------------------------------------------		
+; Calculate relative addressing mode
+;------------------------------------------------------------------------					----BUG
+DOREL				LDX		SAVE_Y 				; restore index			
+					JSR     NNONSPC         	;Find next non space
+                	JSR     GET_EXPRES      	;Evaluate expression                
+                	LDA     UNDEF           	;Undefined label used?
+                	BNE     HEXVAL2OBJ      	;Yes! Can't verify range		
+                	CLC                    		;Calculate displacement (+1!)
+                	LDA     HEXVAL
+                	SBC     PC
+                	STA     HEXVAL
+                	BPL     .NOBOR          	;No borrow needed                	
+                	INC     HEXVAL+1
+.NOBOR          	DEC		HEXVAL				;adjust
+					LDA     HEXVAL+1        	;See if high byte of displacement
+                	SBC     PC+1             	;is 0                	
+                	BEQ     HEXVAL2OBJ      	;OK!
+.RANGE          	JSR     RANGE_ERROR     	;Range error!
+HEXVAL2OBJ      	RTS
+					;LDA     HEXVAL          	;Save displacement
+               		;JMP     SAVE_OBJ
+		
+        		        	       	
+        	
+;------------------------------------------------------------------------
+;Fomrat to Addressing and calculate the addressing given the format of the arguments
+; return format in X, and location to CHKEXT from in A
+;
+; $FF		invalid
+; #ZPG		$nn
+; #ZPX		$nn,X
+; #ZPY		$nn,Y
+; #ABS		$nnnn
+; #ABX		$nnnn,X
+; #ABY		$nnnn,Y
+; #IND		($nnnn)
+; #IDX		($nn,X)
+; #IDY		($nn),Y
+; #INZ		($nn)
+; #IAX		($nnnn,X)
+;		
+;	Addressing modes are organised as follows:
+;
+;	IMP (0)	ZPG (4) INZ (7) ABS (A) IND (D)
+;	ACC (1) ZPX (5) INX (8) ABX (B) IAX (E)
+;	IMM (2) ZPY (6) INY (9) ABY (C) ---
+;	REL (3) ---	 ---	---	---
+;
+;	so algorithm below starts with 4, adds 3 if indirect
+;	and adds 6 if absolute (i.e. 2 byte address), then adds 1 or 2
+;	if ,X or ,Y format
+;
+;------------------------------------------------------------------------
+FMT2AM				LDA 	#$04				; start with mode index of 4
+					LDY 	IN,X
+					CPY 	#OPEN				;Compar '('
+					BNE 	.SKIP
+					CLC							;add 3 for indirect modes
+					ADC 	#$03
+					INX
+.SKIP				PHA							;save mode base back in A						
+					JSR		GET_VAL				;Get all the bytes & including labels
+							
+					;BNE	.CONT
+					;CMP	LABEL_FLAG
+					;BEQ	.FOUND_LABEL								
+					;PLX			
+			
+					DEX
+					SEC							;count bytes (1 or 2 only)
+					TXA							;Contains last count
+					SBC		SAVE_Y				;subtract the begining of addressing
+					LSR							;divied by 2			
+					TAY							;byte count in Y 
+					LDA 	CURMNE
+					CMP 	#$12				;is it JSR?
+					BEQ 	.JSR
+					CMP 	#$38				;is it JMP?
+					BNE 	.NOJMP
+		
+.JSR				LDY 	#$2					;force 2 bytes for these two situations
+					;INY						;following code treats Y = 3 the same as Y = 2
+
+.NOJMP				PLA							;mode base back in A
+					INX							;check for NBYTS failure
+					BEQ 	FERR
+					DEY
+					BEQ 	.1BYT
+.2BYT				CLC							;Two bytes eg: stx $xxxx
+					ADC 	#$06				;add 6 to base index for 2 byte modes
+.1BYT				TAY							;mode index now in Y
+.CHECK				LDA		LABEL_FLAG			;was it a label	;v2.10
+					BNE		.DONE				;v2.10 bug fix
+					JSR		NNONSPC				;next Char in the buffer
+					BEQ 	.DONE				;Check for CR
+					CMP		#';'				;a comment follows 
+					BEQ		FRET
+					CMP 	#SP
+					BNE 	.CONT
+.DONE				LDA 	CHAR				;first Bracket
+					CMP 	#OPEN				;brackets must match
+					BEQ 	FERR
+.RET				CPY 	#$0F				;compare the amount of bytes
+					BPL 	FERR				;no indirect absolute Y mode
+					TYA
+					TAX
+					RTS
+.CONT				CMP 	#CLOSE
+					BNE 	.MORE
+					LDA 	#SP
+					STA 	CHAR				;erase brackets now they have found them
+					INX							;next char in the keyboardf buffer
+					LDA 	IN,X
+					CMP 	#COMMA		
+					BNE 	.CHECK
+.MORE				JSR		NNONSPC				;Next Character (skipping spaces)
+					CMP 	#COMMA
+					BNE 	FERR
+					INX
+					LDA 	IN,X				;Next Character
+					CMP 	#'X'
+					BEQ 	.ISX
+.ISY				CMP 	#'Y'
+					BNE 	FERR
+					LDA 	CHAR
+					CMP 	#OPEN
+					BEQ 	FERR
+					STA 	IN-2,X				;to avoid ,X check below
+					INY
+.ISX				INY
+					LDA 	IN-2,X
+					CMP 	#CLOSE				;No such thing as (...),X mode
+					BEQ 	FERR
+					INX
+					BRA 	.CHECK				;always
+FERR				LDX 	#FAIL				;error message generated upstream
+FRET				RTS
+
+        	          
+;------------------------------------------------------------------------------------------		
+; Get the MNE index using the following rules:
+; 	- lookup awkward cases in a lookup table (DISTBL)
+;	- consider opcodes by category:
+;		1: nnnn1000 -> nnnn
+;		2: nnn10000 -> nnn + BPL
+;		3: nnnn1010 or 0nn00000 -> BRK + nnnn(0nn0)
+;		4: change nnnX0010 to nnnX0001
+;		5: nnnXXXab -> 001abnnn if >= 23
+;		6: 001abnnn + 1 otherwise
+;------------------------------------------------------------------------------------------		
+GETMNE											;get mnemonic index for opcode in A
+												;on completion, A holds the index 
+												;into the mnemonic table
+					STA 	TEMP1				;will need it later
+					LDX 	#TBLSZ				;check lookup table first
+.LOOP				LDA 	DISTBL-2,X
+					CMP 	TEMP1
+					BNE 	.SKIP
+					LDA 	DISTBL-1,X			;got it
+					RTS
+.SKIP				DEX
+					DEX
+					BNE 	.LOOP
+					LDA 	TEMP1	
+					LSR
+					LSR
+					LSR
+					LSR
+					STA 	TEMP2				;save the high nibble
+					LDA 	TEMP1
+					AND 	#$0F
+					CMP 	#$08
+					BNE 	.NOTC1
+					LDA 	TEMP2				;high nibble is our index
+					RTS	
+.NOTC1				LDA 	TEMP1
+					AND 	#$1F
+					CMP 	#$10
+					BNE 	.NOTC2
+					LDA 	TEMP2
+					LSR
+					ADC 	#$39-1				;since carry is set
+					RTS
+.NOTC2				LDA 	TEMP1
+					AND 	#$9F
+					BEQ 	.DOC3
+					AND 	#$0F
+					CMP 	#$0A
+					BNE 	.NOTC3
+.DOC3				LDA 	TEMP2
+					CLC
+					ADC 	#$10
+					RTS
+.NOTC3				LDX 	TEMP1				;does this code end in 10010?
+					TXA
+					AND 	#$1F
+					CMP 	#$12
+					BNE 	.1
+					DEX
+.1					TXA							;? ABCD EFGH - thanks bogax, www.6502.org/forum
+					ASL							;A BCDE FGH0
+					ADC 	#$80				;B ?CDE FGHA
+					ROL							;? CDEF GHAB
+					ASL							;C DEFG HAB0
+					AND 	#$1F				;C 000G HAB0
+					ADC 	#$20				;0 001G HABC
+					CMP 	#$23
+					BMI 	.NOTC5
+					RTS
+.NOTC5				TAX
+					INX
+					TXA
+					RTS        	   
+					
+					
 
 ;------------------------------------------------------------------------------------------		
 ; lookup table for disassembly special cases
@@ -394,332 +734,5 @@ SPINC2		.BYTE $0A, $0B, $0B, $05, $0B, $0C, $0B, $0B
 ; 2nd address mode to check
 SPINC3		.BYTE $0A, $05, $05, $05, $05, $0C, $05, $05
 
-
-
-
-;------------------------------------------------------------------------   
-;Find addressing MODE
-;SRCE = points top begining of NME in buffer
-;CURMNE = location of found NME
-
-ADDMOD							;Check the arguments and work out the
-							;addressing mode
-							;return mode in X
-							;default error value for mode
-							;save it	
-							;Start checking the format...	
-		
-			LDY 	CURMNE			;Holds the current mne index
-			JSR	NNONSPC			;get next no space 				
-			STX     SAVE_Y          	;Save current location in IN							
-			BNE 	.NOTSP			;Not could be 
-		
-.EOL			CPY 	#$12			;check exception first - JSR
-			BEQ	.RET
-			LDY 	#IMP			;implied mode - space
-			JSR 	CHKMOD			;check command is ok with this mode
-			CPY 	#FAIL			;not ok		
-			BEQ 	.NOTIMP			;may still be accumulator mode though
-.RET			RTS
-.NOTIMP 		LDY 	#ACC			;accumulator mode - space
-			JMP 	CHKMOD			;check command is ok with this mode
-		
-.NOTSP			CMP 	#IMV			;immediate mode - '#'
-			BEQ 	.DOIMM				
-			LDY 	#REL
-			JSR 	CHKMOD			;check if command is a branch
-			CPY 	#FAIL
-			BEQ 	.NOTREL					
-			BRA 	DOREL			;Do relative Addressing
-	
-.DOIMM			TYA
-			LDY 	#IMM
-			CMP 	#$2C			;check exception first - STA
-			BEQ 	BAD			
-			CMP 	#$35			;check inclusion - LDX
-			BEQ 	.IMMOK
-			CMP 	#$22			;check inclusion - BIT
-			BEQ 	.IMMOK
-					
-			JSR 	CHKMOD			;check command is ok with this mode
-			CPY 	#FAIL
-			BEQ 	.RET
-		
-.IMMOK			STY	CURADM			;
-			LDX	SAVE_Y
-			INX				;Get next Charater 
-			JSR	GET_EXPRES
-			RTS
-		
-.NOTREL 		;LDX	SAVE_Y			;save two bytes :-) 
-			LDA	IN,X			;check the more complicated modes
-			CMP 	#OPEN			;indirection?
-			BNE 	.CONT			;no
-			INX				;skip the '('
-.CONT			LDX	SAVE_Y			;restore the index
-			JSR 	FMT2AM			;calculate the addressing mode from the format
-			CPX 	#FAIL
-			BEQ 	.RET
-			STY 	CURADM
-;			JMP CHKEXS
-; 			falls through
-
-;------------------------------------------------------------------------
-
-CHKEXS							;Current addressing mode is in X
-			CPY 	#ZPY			;for MNE indices 28 to 2F, ZPY is illegal
-			BNE 	.CONT			;but ABY is ok, so promote byte argument to word
-			LDY 	CURMNE
-			CPY 	#$28
-			BCC 	.CONT
-			CPY 	#$2F+1
-			BCS 	.CONT	
-			LDY 	#ABY			;updated addressing mode
-			BNE 	OK
-.CONT			LDX 	#SPCNT			;check special includes
-.LOOP			LDA 	SPINC1-1,X		;load mnemonic code
-			CMP 	CURMNE
-			BNE 	.NEXT
-			LDY 	SPINC2-1,X		;load addressing mode
-			CPY 	CURADM
-			BEQ 	OK			;match - so ok
-			LDY 	SPINC3-1,X		;load addressing mode
-			CPY 	CURADM
-			BEQ 	OK			;match - so ok
-.NEXT			DEX
-			BNE 	.LOOP
-			LDY 	CURADM
-;	BNE CHKMOD	; wasn't in the exceptions table - check normally
-; falls through
-
-
-;------------------------------------------------------------------------
-; CHeck Adressing Mode
-
-CHKMOD			LDA 	CURMNE			;always > 0
-			CMP 	MIN,y			;mode index in X
-			BCC 	BAD			;mnemonic < MIN
-			CMP 	MAX,y			;MAX,X holds actually MAX + 1
-			BCS 	BAD			;mnemonic > MAX
-OK			STY 	CURADM			;save mode		
-			RTS
-				
-;------------------------------------------------------------------------
-
-BAD			LDY 	#FAIL			;Illegal addressing mode error
-			STY	ERROR	
-			RTS
-
-;------------------------------------------------------------------------		
-; Calculate relative addressing mode
-;------------------------------------------------------------------------					----BUG
-DOREL			LDX	SAVE_Y 			; restore index			
-			JSR     NNONSPC         	;Find next non space
-                	JSR     GET_EXPRES      	;Evaluate expression                
-                	LDA     UNDEF           	;Undefined label used?
-                	BNE     HEXVAL2OBJ      	;Yes! Can't verify range		
-                	CLC                    		;Calculate displacement (+1!)
-                	LDA     HEXVAL
-                	SBC     PC
-                	STA     HEXVAL
-                	BPL     .NOBOR          	;No borrow needed                	
-                	INC     HEXVAL+1
-.NOBOR          	DEC	HEXVAL			;adjust
-			LDA     HEXVAL+1        	;See if high byte of displacement
-                	SBC     PC+1             	;is 0                	
-                	BEQ     HEXVAL2OBJ      	;OK!
-.RANGE          	JSR     RANGE_ERROR     	;Range error!
-HEXVAL2OBJ      	RTS
-		;LDA     HEXVAL          	;Save displacement
-                ;JMP     SAVE_OBJ
-		
-        	
-	        	
-        	
-        	
-;------------------------------------------------------------------------
-
-FMT2AM			; calculate the addressing given
-			; the format of the arguments; 
-			; return format in X, and
-			; location to CHKEXT from in A
-			; $FF		invalid
-			; #ZPG		$nn
-			; #ZPX		$nn,X
-			; #ZPY		$nn,Y
-			; #ABS		$nnnn
-			; #ABX		$nnnn,X
-			; #ABY		$nnnn,Y
-			; #IND		($nnnn)
-			; #IDX		($nn,X)
-			; #IDY		($nn),Y
-			; #INZ		($nn)
-			; #IAX		($nnnn,X)
-;		
-;	Addressing modes are organised as follows:
-;
-;	IMP (0)	ZPG (4) INZ (7) ABS (A) IND (D)
-;	ACC (1) ZPX (5) INX (8) ABX (B) IAX (E)
-;	IMM (2) ZPY (6) INY (9) ABY (C) ---
-;	REL (3) ---	 ---	---	---
-;
-;	so algorithm below starts with 4, adds 3 if indirect
-;	and adds 6 if absolute (i.e. 2 byte address), then adds 1 or 2
-;	if ,X or ,Y format
-;
-			;LDX 	#$00			;save two btyes :-)
-			LDA 	#$04			; start with mode index of 4
-			LDY 	IN,X
-			CPY 	#OPEN			;Compar '('
-			BNE 	.SKIP
-			CLC				;add 3 for indirect modes
-			ADC 	#$03
-			INX
-
-.SKIP			PHA
-			JSR	GET_EXPRES		;Get all the bytes			
-			DEX
-			SEC				;count bytes (1 or 2 only)
-			TXA				;Contains last count
-			SBC	SAVE_Y			;subtract the begining of addressing
-			LSR				;divied by 2			
-			TAY				;byte count in Y 
-			LDA 	CURMNE
-			CMP 	#$12			;is it JSR?
-			BEQ 	.JSR
-			CMP 	#$38			;is it JMP?
-			BNE 	.NOJMP
-		
-.JSR			;LDY 	#$2			;force 2 bytes for these two situations
-			INY				;following code treats Y = 3 the same as Y = 2
-
-.NOJMP			PLA				;mode base back in A
-			INX				;check for NBYTS failure
-			BEQ 	FERR
-			DEY
-			BEQ 	.1BYT
-.2BYT			CLC				;Two bytes eg: stx $xxxx
-			ADC 	#$06			;add 6 to base index for 2 byte modes
-.1BYT			TAY				;mode index now in Y
-.CHECK			JSR	NNONSPC			;next Char in the buffer
-			BEQ 	.DONE			;Check for CR
-			CMP	#';'			;a comment follows 
-			BEQ	FRET
-			CMP 	#SP
-			BNE 	.CONT
-.DONE			LDA 	CHAR			;first Bracket
-			CMP 	#OPEN			;brackets must match
-			BEQ 	FERR
-.RET			CPY 	#$0F			;compare the amount of bytes
-			BPL 	FERR			;no indirect absolute Y mode
-			TYA
-			TAX
-			RTS
-.CONT			CMP 	#CLOSE
-			BNE 	.MORE
-			LDA 	#SP
-			STA 	CHAR			;erase brackets now they have found them
-			INX				;next char in the keyboardf buffer
-			LDA 	IN,X
-			CMP 	#COMMA		
-			BNE 	.CHECK
-.MORE			JSR	NNONSPC			;Next Character (skipping spaces)
-			CMP 	#COMMA
-			BNE 	FERR
-			INX
-			LDA 	IN,X			;Next Character
-			CMP 	#'X'
-			BEQ 	.ISX
-.ISY			CMP 	#'Y'
-			BNE 	FERR
-			LDA 	CHAR
-			CMP 	#OPEN
-			BEQ 	FERR
-			STA 	IN-2,X			;to avoid ,X check below
-			INY
-.ISX			INY
-			LDA 	IN-2,X
-			CMP 	#CLOSE			;No such thing as (...),X mode
-			BEQ 	FERR
-			INX
-			BRA 	.CHECK			;always
-FERR			LDX 	#FAIL			;error message generated upstream
-FRET			RTS
-
-        	          
-;------------------------------------------------------------------------------------------		
-; Get the MNE index using the following rules:
-; 	- lookup awkward cases in a lookup table (DISTBL)
-;	- consider opcodes by category:
-;		1: nnnn1000 -> nnnn
-;		2: nnn10000 -> nnn + BPL
-;		3: nnnn1010 or 0nn00000 -> BRK + nnnn(0nn0)
-;		4: change nnnX0010 to nnnX0001
-;		5: nnnXXXab -> 001abnnn if >= 23
-;		6: 001abnnn + 1 otherwise
-;------------------------------------------------------------------------------------------		
-	
-GETMNE							;get mnemonic index for opcode in A
-							;on completion, A holds the index 
-							;into the mnemonic table
-			STA 	TEMP1			;will need it later
-			LDX 	#TBLSZ			;check lookup table first
-.LOOP			LDA 	DISTBL-2,X
-			CMP 	TEMP1
-			BNE 	.SKIP
-			LDA 	DISTBL-1,X		;got it
-			RTS
-.SKIP			DEX
-			DEX
-			BNE 	.LOOP
-			LDA 	TEMP1	
-			LSR
-			LSR
-			LSR
-			LSR
-				STA 	TEMP2		;save the high nibble
-				LDA 	TEMP1
-			AND 	#$0F
-			CMP 	#$08
-			BNE 	.NOTC1
-			LDA 	TEMP2			;high nibble is our index
-			RTS	
-.NOTC1			LDA 	TEMP1
-			AND 	#$1F
-			CMP 	#$10
-			BNE 	.NOTC2
-			LDA 	TEMP2
-			LSR
-			ADC 	#$39-1			;since carry is set
-			RTS
-.NOTC2			LDA 	TEMP1
-			AND 	#$9F
-			BEQ 	.DOC3
-			AND 	#$0F
-			CMP 	#$0A
-			BNE 	.NOTC3
-.DOC3			LDA 	TEMP2
-			CLC
-			ADC 	#$10
-			RTS
-.NOTC3			LDX 	TEMP1			;does this code end in 10010?
-			TXA
-			AND 	#$1F
-			CMP 	#$12
-			BNE 	.1
-			DEX
-.1			TXA				;? ABCD EFGH - thanks bogax, www.6502.org/forum
-			ASL				;A BCDE FGH0
-			ADC 	#$80			;B ?CDE FGHA
-			ROL				;? CDEF GHAB
-			ASL				;C DEFG HAB0
-			AND 	#$1F			;C 000G HAB0
-			ADC 	#$20			;0 001G HABC
-			CMP 	#$23
-			BMI 	.NOTC5
-			RTS
-.NOTC5			TAX
-			INX
-			TXA
-			RTS        	       	
+					    	
 
