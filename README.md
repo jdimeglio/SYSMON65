@@ -22,8 +22,7 @@ My goal for *SYSMON65* is to be a software development tool for my SBC. A user m
 Parts of my code was inspired by the following:
 
 - The *A1 Assembler* by San Bergmans
-I liked the front-end editor only, but the assembler does not come with a dissembler. However the assembler is a 2-pass assembler and feels very solid, but it was written primarily for an Apple computer, and therefore limited to only 6502 instruction set.
-With San’s permission I used his front-end editor code, reviewed every line, but eventually re-wrote most of it - lile 98% of it.  This allowed me to ensure I could get the full use of the 65C02 instructions but fully integrated it into my OS
+I liked the front-end editor only, but the assembler does not come with a dissembler. However the assembler is a 2-pass assembler and feels very solid, but it was written primarily for an Apple computer, and therefore limited to only 6502 instruction set. With San’s permission I used his front-end editor code, reviewed every line, but in the end re-wrote most of it.  This allowed me to ensure I could get the full use of the 65C02 instructions but fully integrated it into my OS
 
 - The KRUSADER by Ken Wessen
 Among other things this has a super-efficient disassembler (most likely created by MOS and used by Apple) and includes the specific 65C02 instructions. With respect, I did not like anything else.
@@ -33,5 +32,3 @@ The look and feel of *SYSMON65* was heavily influenced by the famous line-orient
 *SYSMON65* has a full 2-pass assembler with local and global labels, directives, and much more. A 65C02 disassembler is included. Ive also built step-by-step debugger (aka Tracing), memory dumps, ASCII dumps, fill, delete, block move, intel hex loader, Kermit and a library to drive LCD display to name a few.
 
 *SYSMON65* has been tested on real hardware running a N65C02 processor. It also includes code for an LCD 16x2 module. The software currently takes just over 7.2KB of memory space.
-
-
