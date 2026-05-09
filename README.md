@@ -7,7 +7,7 @@
 ╚═════╝░░░░╚═╝░░░╚═════╝░╚═╝░░░░░╚═╝░╚════╝░╚═╝░░╚══╝░╚════╝░╚═════╝░
 ```
 
-# SYSMON65 (Version 2.20)
+# SYSMON65 (Version 2.30)
 
 **SYSMON65** is my custom-built operating system designed for 65C02-based Single Board Computers (SBCs). 
 
