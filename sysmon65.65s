@@ -1,8 +1,8 @@
 ; MAIN FILE SYSMON65.65S
-; version 2.20
+; version 2.30 May 2026
 ; two pass symbolic assembler, dissembler and tracer
 ; REGB bits 0-3 are connected to LED's
-; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
+; tested in Michael Kowalski 6502 Simulator - using 65C02 Code & SYMON
 ; Programmed by Joe DiMeglio
 ; https://github.com/jdimeglio/6502-Monitor
 ; bug fixes
@@ -16,7 +16,6 @@
 ;------------------------------------------------------------------------       
 SKIP2BYTES      .MACRO
                 .DB $2C                         ;cheat to skip two bytes
-
                 .ENDM
                 
 SKIP1BYTE       .MACRO
@@ -28,10 +27,13 @@ SKIP1BYTE       .MACRO
 ;------------------------------------------------------------------------
 
 BRKAS2              =   0                       ;Add a second BRK byte
-MYWYM               =   0                       ;has MYWYM Board settings/Chips
+MYWYM               =   1                       ;has MYWYM Board settings/Chips MUST BE SET for real 65C02
 LCD_ROUTINES        =   0                       ;Compile with LCD 16x2 lines    
 SYMON               =   1                       ;used for SYMON to define CIA and VIA 
-ROM_LIBRRAY         =   1                       ;adds ROM library to assembler
+ROM_LIBRRAY         =   0                       ;adds ROM library to assembler
+PROTEUS 	    	=   0         				;Use Proetus Memory address
+
+
     
         .INCLUDE    "constants.65s"
     
@@ -269,7 +271,6 @@ BUMPSRCE            CLC
                     INC     SRCE+1                      
 .BUMPSRCE           RTS             
 
-
 ;------------------------------------------------------------------------   
 ;Instruction display - orginal code seems to come from MOS
 ;------------------------------------------------------------------------   
@@ -278,10 +279,7 @@ INSTDSP             TAY                         ;Save op code
                     BCC     .IEVEN
                     ROR                         ;* Test B1
                     BCS     .ERR                ;XXXXXX11 instr invalid
-                    ;CMP    #$A2    
-                    ;BEQ    ERR                 ;10001001 instr invalid
                     AND     #$87                ;Mask 3 bits for address mode
-                    ;ORA    #$80                ;* add indexing offset
 .IEVEN              LSR                         ;* LSB into carry for
                     TAX                         ;Left/right test below
                     LDA     MODE,X              ;Index into address mode table
@@ -298,7 +296,7 @@ INSTDSP             TAY                         ;Save op code
                     LDA     MODE2,X             ;Index into print format table
                     STA     SAVE_Y              ;Save for address field format
                     AND     #$03                ;Mask 2-bit length.  0=1-byte
-                    STA     LENG                ;*  1=2-byte, 2=3 byte
+                    STA     LENG                ;* 1=2-byte, 2=3 byte
                     TYA                         ;* op code
                     JSR     GETMNE              ;Lookup the mnemonic
                     LDY     #$00
@@ -308,7 +306,7 @@ INSTDSP             TAY                         ;Save op code
                     LDX     #$01
 .PROPBL             JSR     WRBL2
                     CPY     LENG                ;Print instr (1 to 3 bytes)
-                    INY                         ;*  in a 12-character field
+                    INY                         ;* in a 12-character field
                     BCC     .PROP
                     LDX     #$03                ;char count for mnemonic print
                     STX     PRFLAG              ;So EXPMNE prints the mnemonic
@@ -318,36 +316,220 @@ INSTDSP             TAY                         ;Save op code
                     TAX
                     JSR     EXPMNE              ;Expand the Memonic
                     JSR     WRBLNK              ;Output 3 blanks
-                    LDY     LENG            
-                    LDX     #$06                ;Count for 6 print format bits
-.PPADR1             CPX     #$03
-                    BEQ     .PPADR5             ;If X=3 then print address val
-.PPADR2             ASL     SAVE_Y              ;Test next print format bit
-                    BCC     .PPADR3             ;If 0 don't print
-                    LDA     CHAR1-1,X           ; *  corresponding chars
-                    JSR     WRCHAR              ;Output 1 or 2 chars
-                    LDA     CHAR2-1,X           ;*  (If char from char2 is 0,
-                    BEQ     .PPADR3             ;*   don't output it)
+                    
+                    LDY     LENG                ;Load the instruction length
+                    LDX     #$06                ;We will check up to 6 formatting bits (from SAVE_Y)
+.PPADR1             CPX     #$03        
+                    BNE     .PPADR2             ;When X is not 3, proceed to formatting chars
+                    
+                    							;NEW LABEL INTERCEPTOR
+                    JSR     PRINT_OP_OR_LABEL   ;Print the Label (if found) or raw Hex Operand
+                    LDA     SAVE_Y              
+                    CMP     #$E8                ;Was it a Relative Branch?
+                    BCS     .EXIT_DSP           ;If so, exit immediately (mimics original 6502 formatting behavior)
+                    
+.PPADR2             ASL     SAVE_Y              ;Shift the format byte left
+                    BCC     .PPADR3             ;If Carry is clear, don't print a character here
+                    LDA     CHAR1-1,X           ;Fetch the corresponding formatting character (e.g., '(' or '#')
+                    JSR     WRCHAR              ;Print the formatting character
+                    LDA     CHAR2-1,X           ;Check if there is a second formatting character (e.g., 'X' or 'Y')
+                    BEQ     .PPADR3             ;If it's $00, skip it
+                    JSR     WRCHAR              ;Print the second formatting character
+.PPADR3             DEX                         ;Decrement format bit counter
+                    BNE     .PPADR1             ;Loop until all format bits are processed
+.EXIT_DSP           STX     PRFLAG              ;Reset print flag to 0
+                    RTS                         ;Return (Instruction fully printed!)
+
+; =======================================================================
+; PRINT OPERAND OR LABEL
+; Calculates the 16-bit target address, searches the Symbol Table, and 
+; prints the Label if found. Otherwise, falls back to raw Hex bytes.
+; =======================================================================
+PRINT_OP_OR_LABEL   PHX                         ;Preserve format counter (X=3)
+                    
+                    LDY     LENG
+                    BEQ     .EXIT_NO_OP         ;BUG FIX: 1-byte instructions have no operand! Bail out immediately.
+                    
+                    LDA     SAVE_Y
+                    CMP     #$21                ;Is it Immediate mode? (#$xx)
+                    BEQ     .PRINT_HEX          ;Do not substitute labels for immediate values!
+                    
+                    CMP     #$E8                ;Is it Relative mode? (BNE, BEQ, BRA)
+                    BCS     .CALC_REL
+                    
+                    							;Extract Normal Address (Absolute / Zero Page) ---
+                    LDY     #$01
+                    LDA     (SRCE),Y            ;Get Low byte
+                    STA     HEXVAL              ;Use HEXVAL as safe temporary storage
+                    STZ     HEXVAL+1            ;Default High byte to 00 (Zero Page)
+                    
+                    LDY     LENG
+                    CPY     #$02                ;Is it a 2-byte operand? (Absolute)
+                    BNE     .LOOKUP
+                    LDA     (SRCE),Y            ;Get High byte
+                    STA     HEXVAL+1
+                    BRA     .LOOKUP
+
+.CALC_REL           							;Calculate Relative Address ---
+                    LDY     LENG                ;Fetch relative offset byte
+                    LDA     (SRCE),Y
+                    JSR     PCADJ3              ;A = Low, Y = High (Uses existing PC Math)
+                    TAX                         ;Move Low to X
+                    INX                         ;Adjust +1 for exact branch target
+                    BNE     .REL_NO_CARRY
+                    INY                         ;Handle page cross
+.REL_NO_CARRY       STX     HEXVAL              ;Save Target Low
+                    STY     HEXVAL+1            ;Save Target High
+
+.LOOKUP             							;earch Symbol Table ---
+                    JSR     SEARCH_SYMBOL_TABLE
+                    BCS     .PRINT_HEX          ;Carry Set = Not Found in Symbol Table
+
+                    							;Found! Print Label String ---
+                    JSR     PRINT_LABEL_STRING
+.EXIT_NO_OP         PLX                         ;Restore format counter
+                    RTS                         ;Return to INSTDSP
+
+.PRINT_HEX          							;Fallback: Print Raw Hex ---
+                    LDA     SAVE_Y
+                    CMP     #$E8                ;Was it Relative?
+                    BCS     .HEX_REL
+                    
+                    							;Normal Hex Print (High byte then Low byte)
+                    LDY     LENG
+.HEX_LOOP           LDA     (SRCE),Y
+                    JSR     WR2HEX
+                    DEY
+                    BNE     .HEX_LOOP           ;Safe loop: LENG is guaranteed > 0 by the BEQ at the top
+                    PLX                         ;Restore format counter
+                    RTS
+                    
+.HEX_REL            							;Print Relative Hex Target (High then Low)
+                    LDA     HEXVAL+1
+                    JSR     WR2HEX
+                    LDA     HEXVAL
+                    JSR     WR2HEX
+                    PLX                         ;Restore format counter
+                    RTS
+
+; =======================================================================
+; SEARCH_SYMBOL_TABLE
+; Scans SYM_TABLE for an address matching HEXVAL (Reverse Lookup).
+; Dynamically tracks Global Label base addresses to resolve Local Label
+; offsets. Record length is determined by scanning for the $FF terminator.
+; Returns: Carry CLEAR if found (DEST points to symbol), Carry SET if not.
+; =======================================================================
+SEARCH_SYMBOL_TABLE LDA     SYM_TABLE
+                    STA     DEST
+                    LDA     SYM_TABLE+1
+                    STA     DEST+1
+                    ORA     SYM_TABLE           ;If table pointer is 0000, no symbols exist
+                    BEQ     .NOT_FOUND
+                    STZ     TEMP2               ;Init running Global Base Low
+                    STZ     TEMP2+1             ;Init running Global Base High
+
+.NEXT_SYM           LDY     #$00
+                    LDA     (DEST),Y            
+                    BEQ     .NOT_FOUND          ;00 marker = End of symbol table!
+
+                    							;Find record length by scanning for $FF ---
+.FIND_LEN           LDA     (DEST),Y
+                    INY
+                    CMP     #$FF
+                    BNE     .FIND_LEN
+                    
+                    TYA                         ;Save record length in X
+                    TAX                         
+                    
+                    CPX     #$05                ;Is length < 5? 
+                    BCC     .CHK_LOCAL          ;If yes, it's a 3-byte Local Label!
+
+.CHK_GLOBAL         							;Process Global Label ---
+                    LDY     #$01
+                    LDA     (DEST),Y            ;Fetch Global Address Low
+                    STA     TEMP2               ;Update running Global Base Low
+                    CMP     HEXVAL
+                    BNE     .UP_GLOB_HI
+                    
+                    INY
+                    LDA     (DEST),Y            ;Fetch Global Address High
+                    STA     TEMP2+1             ;Update running Global Base High
+                    CMP     HEXVAL+1
+                    BEQ     .FOUND              ;Exact 16-bit Match!
+                    BRA     .ADVANCE
+
+.UP_GLOB_HI         INY                         ;We must keep the High byte updated 
+                    LDA     (DEST),Y            ;for subsequent local label calculations
+                    STA     TEMP2+1
+                    BRA     .ADVANCE
+
+.CHK_LOCAL          							;Process Local Label ---
+                    LDY     #$01
+                    LDA     (DEST),Y            ;Fetch Local Offset byte
+                    CLC
+                    ADC     TEMP2               ;Add to Global Base Low
+                    CMP     HEXVAL
+                    BNE     .ADVANCE
+                    
+                    LDA     TEMP2+1             
+                    ADC     #$00                ;Add Carry to Global Base High
+                    CMP     HEXVAL+1
+                    BEQ     .FOUND              ;Exact 16-bit Match!
+
+.ADVANCE            							;Move DEST to the next record ---
+                    TXA                         ;Restore record length from X
+                    CLC
+                    ADC     DEST
+                    STA     DEST
+                    BCC     .NEXT_SYM
+                    INC     DEST+1
+                    BRA     .NEXT_SYM
+
+.FOUND              CLC                         ;Success
+                    RTS
+.NOT_FOUND          SEC                         ;Failure
+                    RTS
+
+; =======================================================================
+; PRINT_LABEL_STRING
+; Prints the label name. If Global, fetches the source code text pointer.
+; If Local, manually formats and prints the '.' prefix and binary ID.
+; =======================================================================
+PRINT_LABEL_STRING  CPX     #$05                ;X holds the record length from the search loop
+                    BCC     .PRT_LOCAL          ;If < 5, it is a Local Label
+
+.PRT_GLOBAL         LDY     #$03
+                    LDA     (DEST),Y            ;Fetch Source Code Pointer Low
+                    STA     TEMP1           
+                    INY
+                    LDA     (DEST),Y            ;Fetch Source Code Pointer High
+                    STA     TEMP1+1
+                    
+                    LDY     #$03                ;Offset 3: Skips Length and Line Number bytes in Source
+.PRT_LOOP           LDA     (TEMP1),Y
+                    BMI     .DONE               ;B7 Set = Packed Token (End of label)
+                    CMP     #':'            
+                    BEQ     .DONE               ;Colon = End of label
+                    CMP     #SP
+                    BEQ     .DONE               ;Space = End of label
+                    CMP     #CR
+                    BEQ     .DONE               ;CR = End of line
+                    
+                    AND     #$7F                ;Ensure character is clean ASCII
+                    JSR     WRCHAR              ;Print the character to terminal
+                    INY
+                    BRA     .PRT_LOOP
+.DONE               RTS
+
+.PRT_LOCAL          LDA     #'.'                ;Local labels start with a dot
                     JSR     WRCHAR
-                    ;LDA    UNDEF
-                    ;JSR    WRDECI  
-.PPADR3             DEX   
-                    BNE     .PPADR1
-                    STX     PRFLAG              ;reset flag to 0
-                    RTS                         ;Return if done 6 format bits
-.PPADR4             DEY
-                    BMI     .PPADR2
-                    JSR     WR2HEX              ;Output 1- or 2-byte address
-.PPADR5             LDA     SAVE_Y
-                    CMP     #$E8                ;Handle rel addressing mode
-                    LDA     (SRCE),Y            ;Special print target adr
-                    BCC     .PPADR4             ;*  (not displacement)
-.RELADR             JSR     PCADJ3              ;PCL,H + DISPL + 1 to A,Y
-                    TAX 
-                    INX                         ;adjust                
-                    BNE     PRNTYX              ;*     +1 to X,Y
-                    INY         
-PRNTYX              TYA                         ;falls through
+                    LDY     #$00
+                    LDA     (DEST),Y            ;Fetch the local label ID (e.g., binary 1 or 2)
+                    AND     #$7F                ;Mask out declared flags just in case
+                    TAY                         ;Move to Y (LSB parameter for WRDECI)
+                    LDA     #$00                ;Move 0 to A (MSB parameter for WRDECI)
+                    JSR     WRDECI              ;Print the ID as a decimal number
+                    RTS
 
 
 ;------------------------------------------------------------------------   
@@ -495,22 +677,22 @@ CMD_ASCIIDUMP       JSR     GET_EXPRES          ;Get Source aka get expression
                     STA     COUNT               
                     LDY     #$14                
 .NEXTLINE           PHY             
-                    JSR     DISPLAY_ADDR            ; display address format        
+                    JSR     DISPLAY_ADDR         ;display address format        
                     JSR     ASCII_DUMP          
                     JSR     WRCRLF          
                     LDA     #42
-                    JSR     BUMPSRCE        ; Add to SRCE
+                    JSR     BUMPSRCE        	 ;Add to SRCE
                     PLY         
                     DEY         
                     BNE     .NEXTLINE           
-                    STZ     ERROR           ; No Error
+                    STZ     ERROR           	 ;No Error
                     RTS
 
 
 ;------------------------------------------------------------------------
 ;ASCII DUMP one line
 ;------------------------------------------------------------------------ 
-ASCII_DUMP          LDA     #'/'            ;ASCII DUMP - Dumps ASCII onto the screen
+ASCII_DUMP          LDA     #'/'            	 ;ASCII DUMP - Dumps ASCII onto the screen
                     JSR     WRCHAR          
                     LDY     #$00                        
 .NEXTCHAR1          LDA     (SRCE),y
@@ -552,12 +734,12 @@ CMD_MEMORY_DUMP     JSR     GET_EXPRES          ;DUMPS MEMORY TO THE SCREEN
                     STY     SRCE
                     STA     SRCE+1                                                  
 .CONT               JSR     CLS                 ;Cursor top left
-                    JSR     STRING
-                        
-                .ASCII "   _____ _____ _____",CR,LF
-                .ASCII "  |     |   __|     |",CR,LF
-                .ASCII "  | | | |   __| | | |",CR,LF
-                .ASCII "  |_|_|_|_____|_|_|_|",CR,LF, EOS
+           ;         JSR     STRING
+           ;             
+           ;     .ASCII "   _____ _____ _____",CR,LF
+           ;     .ASCII "  |     |   __|     |",CR,LF
+           ;     .ASCII "  | | | |   __| | | |",CR,LF
+           ;     .ASCII "  |_|_|_|_____|_|_|_|",CR,LF, EOS
                 
                     JSR     DMPGR               ;draw the 00 01 02 03 etc etc
                     JSR     DRAWLINECR          ;draw line
@@ -623,6 +805,7 @@ DRAW_SCREEN         LDA     DEST                ;Refresh WHOLE screen
 ; DEST start of Memory Page to be edited
 ; SAVY,SAVX  = X,Y location for memory to be edited
 ;------------------------------------------------------------------------ 
+
 CMD_EDIT_MEMORY     JSR     GET_EXPRES          ;edit memory
                     BNE     .CONT1                  
                     STY     SRCE                ;store source
@@ -661,96 +844,94 @@ SCAN_KEYBOARD       JSR     CHECK_WIN_FRAME
 
 .CHECKUP            CMP     #UPARROW
                     BNE     .DIGITCHECK                 
-                    DEC     SAVX
+                    DEC     SAVY
                     BRA     SCAN_KEYBOARD
-            
-.DIGITCHECK         CMP     #CR                 ;Was CR pressed
-                    BNE     SCAN_KEYBOARD   
-                    JSR     COMMANDLINE 
-                    LDA     #ADDR_MSG                   
-                    JSR     PRINT_MSGS
-                    JSR     RD2HEX
-                    STA     HEXVAL              ;save binary value that was inputted
-                    LDA     SAVY                ;calculate Memory address                   
-                    ASL                         ;multiple by 16
-                    ASL         
-                    ASL
-                    ASL 
-                    STA     TEMP1               ;now TEMP1=SAVY*16 (y memory index)
-                    LDA     SAVX            
-                    CLC
-                    ADC     TEMP1               ;Y*16+X                                                 
-                    TAY                         ;A= index to memory location
-                    LDA     HEXVAL  
-                    STA     (DEST),Y
-                    JSR     COMMANDLINE_CLR                 
-                    BRA     SCAN_KEYBOARD       ;done - go back and start again                 
-
+                    
+                    
 .EXIT               LDY     #18                 ;return cursor to bottom of screen           
                     LDX     #00                 
-                    JSR     GOTOXY
-EXIT_WIN_FRAME      RTS 
+                    JMP     GOTOXY		    		 
+            
+.DIGITCHECK         							;At this point, A holds the key pressed.
+                    JSR     HEX2BIN             ;Attempt to convert ASCII to Hex
+                    CMP     #FAIL               ;Did it return FAIL?
+                    BEQ     .NOT_HEX            ;Yes, ignore it!
+
+.IS_HEX_CHAR        							;User typed a valid FIRST hex digit!
+                    ASL     
+                    ASL     
+                    ASL     
+                    ASL     
+                    STA     HEXVAL              ;Save the High Nibble 
                     
-
-
-;------------------------------------------------------------------------
-; defined Command line row 20
-;------------------------------------------------------------------------
-COMMANDLINE         LDY     #20                 ;return cursor to bottom of screen           
-                    LDX     #00                 
-                    JSR     GOTOXY
-                    RTS
+.WAIT_SEC_CHAR      JSR     RDCHAR              ;Wait for the SECOND hex digit
+                    JSR     HEX2BIN             ;Attempt to convert
+                    CMP     #FAIL
+                    BEQ     .WAIT_SEC_CHAR      ;If invalid, wait for another key
                     
-;------------------------------------------------------------------------
-;clear row 20 (31 spaces)
-;------------------------------------------------------------------------                   
-COMMANDLINE_CLR     JSR     COMMANDLINE
-                    JSR     STRING
-                .DB     $FF                     ;draw space 31 characters       
-                    RTS
+.GOT_SEC_CHAR       ORA     HEXVAL              ;Combine Low Nibble with High Nibble
+                    STA     HEXVAL          	                    
+                    
+                    LDA     SAVY                ;Get Y coordinate (0-15)
+                    ASL                        
+                    ASL              
+                    ASL     
+                    ASL                         ;Shift to high nibble
+                    ORA     SAVX                ;Merge with X coordinate!
+                    TAY                         ;Move directly to index register
+                    LDA     HEXVAL  
+                    STA     (DEST),Y            ;Write the assembled byte to RAM!
+                    JSR     MOVETOCUROR         ;Ensure cursor is pinned
+                    LDA     HEXVAL
+                    JSR     WR2HEX              ;Print new byte directly over the old one
+                    INC     SAVX
+.NOT_HEX            BRA     SCAN_KEYBOARD       ;Not an arrow, not hex. Ignore it.
 
-
+          
 ;------------------------------------------------------------------------
-;Dump Offsets to Screen -   ;check if within Window Frame
+; Dump Offsets to Screen - check if within Window Frame (FIXED)
 ;------------------------------------------------------------------------           
-CHECK_WIN_FRAME     LDX     SAVX                ;Load up X,Y            
+CHECK_WIN_FRAME     LDX     SAVX
                     LDY     SAVY
-                    CPX     #00                 ;did it go neg
-                    BPL     .CHECK_X_MAX                    
-                    STZ     SAVX                                
-                    DEY
-                    DEC     SAVY                ;go back a screen load                                  
-                    BRA     .CHECK_Y_MIN        ;have to jump X=$FF here    
-                
-.CHECK_X_MAX        CPX     #16                 ;X limit
+
+.CHECK_X_NEG        CPX     #$80                ;Did X go negative? ($FF)
+                    BCC     .CHECK_X_MAX        ;If 0-15, it's fine, check max
+                    LDX     #15                 ;Wrap to right side of screen
+                    STX     SAVX
+                    DEY                         ;Move up one row
+                    DEC     SAVY
+                    BRA     .CHECK_Y_NEG
+
+.CHECK_X_MAX        CPX     #16                 ;Did X exceed screen width?
+                    BCC     .CHECK_Y_NEG
+                    STZ     SAVX                ;Wrap to left side of screen
+                    INY                         ;Move down one row
+                    INC     SAVY
+
+.CHECK_Y_NEG        CPY     #$80                ;Did Y go negative? ($FF)
                     BCC     .CHECK_Y_MAX
-                    STZ     SAVX                ;New Line eg CR   
-                    INY 
-                    INC     SAVY                ;LF eqivilent   
-                
-.CHECK_Y_MAX        CPY     #16                 ;Y screen limit
-                    BCC     .CHECK_Y_MIN        ;Not exceed then check Y min
-                    DEC     SAVY                ;adjust Y + $FF bytes forward
-                    LDA     DEST
-                    CLC
-                    ADC     #$10
-                    STA     DEST
-                    BCC     .SKIP_ADC
-                    INC     DEST+1              
-.SKIP_ADC           JMP     DRAW_SCREEN         ;redraw screen & then RTS
-                    
-.CHECK_Y_MIN        CPY     #00
-                    BPL     EXIT_WIN_FRAME          
-                    STZ     SAVY            
-                    LDA     DEST                ;sbc 1 page
-                    SEC 
+                    STZ     SAVY                ;Pin cursor to top row
+                    LDA     DEST                ;Scroll screen UP 1 line (16 bytes)
+                    SEC
                     SBC     #$10
                     STA     DEST
                     BCS     .SKIP_SBC
                     DEC     DEST+1
-.SKIP_SBC           JMP     DRAW_SCREEN         ;redraw screen & then RTS                               
-;.EXIT              RTS                         ;save a byte
+.SKIP_SBC           JMP     DRAW_SCREEN         ;Redraw and RTS
 
+.CHECK_Y_MAX        CPY     #16                 ;Did Y exceed screen height?
+                    BCC     .EXIT               ;If < 16, everything is perfectly in bounds!
+                    LDY     #15                 ;Pin cursor to bottom row
+                    STY     SAVY
+                    LDA     DEST                ;Scroll screen DOWN 1 line (16 bytes)
+                    CLC
+                    ADC     #$10
+                    STA     DEST
+                    BCC     .SKIP_ADC
+                    INC     DEST+1
+.SKIP_ADC           JMP     DRAW_SCREEN         ;Redraw and RTS
+
+.EXIT               RTS
 
 ;------------------------------------------------------------------------
 ;Dump Offsets to Screen
@@ -886,9 +1067,9 @@ PNTR_ERR_WRT        .ASCIS      " :UNABLE TO WRITE/READ"        ;Read/Write Erro
             
 TEXT1               .ASCIS      "AUTONUM ENABLE starting "      ;
 PNTR_ERRORS         .ASCII      " COMPILE ERROR(s)",CR,LF + $80
-PNTR_CANCEL         .ASCIS      "/"     
+;PNTR_CANCEL         .ASCIS      "/"     
 PNTR_CODE_ORG       .ASCIS      ".ORG ->"
-PNTR_ADDR_MSG       .ASCIS      "addrs"
+;PNTR_ADDR_MSG       .ASCIS      "addrs"
 
 ERR_SYN     =   PNTR_ERR_SYN - TEXT                             ;index to messages 
 ERR_LBL     =   PNTR_ERR_LBL - TEXT     
@@ -907,9 +1088,9 @@ ERR_WRT     =   PNTR_ERR_WRT - TEXT
 
 AUTOTEXT    =   0               ;Flag to set aut oumbering
 STR_ERRORS  =   PNTR_ERRORS  - TEXT1    
-STR_CANCEL  =   PNTR_CANCEL  - TEXT1
+;STR_CANCEL  =   PNTR_CANCEL  - TEXT1
 CODE_ORG    =   PNTR_CODE_ORG  - TEXT1
-ADDR_MSG    =   PNTR_ADDR_MSG - TEXT1   
+;ADDR_MSG    =   PNTR_ADDR_MSG - TEXT1   
         
 ;------------------------------------------------------------------------
 ; Find next non space
@@ -1026,24 +1207,25 @@ GET_VAL             STZ     NEG_FLAG            ;Clear negative flag
 ;------------------------------------------------------------------------
 .HEX                CMP     #'$'                ;Is it a hex number?
                     BNE     .BIN                ;Nope!
-.HEXLOOP            INX                         ;Get next character from IN
+.HEXLOOP            INX                         
                     LDA     IN,X
-                    JSR     HEX2BIN                
+                    JSR     HEX2BIN         
                     CMP     #FAIL
-                    BEQ     .NOTHEX             ;No hex digit anymore!
-.DIG                ASL                         ;Left justify new nibble
-                    ASL
-                    ASL
-                    ASL
+                    BEQ     .NOTHEX             
+                    
+                    STA     TEMP1               ;Save the new 4-bit nibble (0-15)
                     LDY     #4                  ;Set shift counter
-                    STY     DELIM               ;Indicate that input is correct
-.HEXSHIFT           ASL                         ;Shift new bit into result
-                    ROL     HEXVAL
+                    STY     DELIM               
+.HEXSHIFT           ASL     HEXVAL              ;Shift the 16-bit result left by 1
                     ROL     HEXVAL+1
                     BCS     .RANGE              ;Exit with range error!
-                    DEY                         ;Decrement counter
+                    DEY                         
                     BNE     .HEXSHIFT           ;Do all 4 bits
-                    BEQ     .HEXLOOP            ;Do next nibble (if any)!
+                    
+                    LDA     TEMP1               ;Retrieve the new nibble
+                    ORA     HEXVAL              ;Merge it perfectly into the newly opened bottom 4 bits!
+                    STA     HEXVAL
+                    BRA     .HEXLOOP
 .NOTHEX             LDA     DELIM               ;Was a digit entered?
                     BNE     .DONEG1             ;Yes!
                     LDA     PC_BEG              ;If not it was the PC value!
@@ -1175,7 +1357,7 @@ GET_EXPRES          JSR     GET_VAL             ;Get value A=hi Y=lo address
                     DEX                         ;End of expression. One too far
                     LDA     HEXVAL+1            ;Load value now
                     LDY     HEXVAL
-                    CPY     HEXVAL              ;Make Z=0 (No errors)
+                    CPY     HEXVAL              ;Make Z=1 (No errors)
 .RTS                RTS                         ;None of the above! We're done!
 .ADD                JSR     GET_VAL             ;Get next value
                     BNE     .RTS                ;An error occurred!
@@ -1235,21 +1417,19 @@ GET_EXPRES          JSR     GET_VAL             ;Get value A=hi Y=lo address
                     ROL     EXP_SAVE+1
                     ROL     MULDIV
                     ROL     MULDIV+1
-                    SEC                         ;Does operand 2 go into temp?
+                    SEC                         ; Does operand 2 go into temp?
                     LDA     MULDIV
                     SBC     HEXVAL
-                    PHA                         ;Don't save temp yet
+                    STA     TEMP1               ; OPTIMIZATION: Save trial low byte to Zero Page
                     LDA     MULDIV+1
                     SBC     HEXVAL+1
-                    BCC     .DIVSKIP            ;It didn't go!
-                    INC     EXP_SAVE            ;Set low bit of result
-                    STA     MULDIV+1            ;Save new temp result
-                    PLA                         ;Save low byte too without
-                    PHA                         ; affecting the stack
-                    STA     MULDIV
-.DIVSKIP            PLA                         ;Clear stack
-                    DEY
-                    BNE     .DIVLOOP            ;Do all 16 bits!
+                    BCC     .DIVSKIP            ; It didn't go! Skip updating MULDIV
+                    INC     EXP_SAVE            ; It went! Set low bit of quotient
+                    STA     MULDIV+1            ; Save new high byte
+                    LDA     TEMP1               ; Retrieve trial low byte from ZP
+                    STA     MULDIV              ; Save new low byte
+.DIVSKIP            DEY
+                    BNE     .DIVLOOP            ; Do all 16 bits!
                     LDY     EXP_SAVE            ;Preload the value
                     STY     HEXVAL
                     LDA     EXP_SAVE+1
@@ -1313,20 +1493,6 @@ WRDECI              STY     EXP_SAVE            ;
 .DECIH          .BYTE     $00,$00,$00,$03,$27
 
 
-;------------------------------------------------------------------------
-; Check object if code was generated
-;------------------------------------------------------------------------
-CHECK_OBJ           CLC
-                    LDA     TA                  ;See if code was generated
-                    EOR     TA_BEGIN
-                    BEQ     .NOK            ;no code        
-                    BRA     .CODE
-.NOK                LDA     TA+1            ;what about high byte   
-                    EOR     TA_BEGIN+1
-                    BEQ     .CHECK_OBJ_RTS      ; No code!                           
-.CODE               SEC         
-.CHECK_OBJ_RTS      RTS
-
 
 ;------------------------------------------------------------------------
 ; Print object range
@@ -1357,17 +1523,24 @@ PRINT_OBJ           LDA     TA                  ;See if code was generated
 ;------------------------------------------------------------------------
 ; Make HEXVAL negative
 ;------------------------------------------------------------------------
-NEGATE              LDA     HEXVAL              ;Negate value
-                    EOR     #$FF
-                    STA     HEXVAL
-                    LDA     HEXVAL+1
-                    EOR     #$FF
-                    INC     HEXVAL
+;NEGATE              LDA     HEXVAL              ;Negate value
+ ;                   EOR     #$FF
+ ;                   STA     HEXVAL
+ ;                   LDA     HEXVAL+1
+ ;                   EOR     #$FF
+ ;                   INC     HEXVAL
 ;                   BNE     .RTS                ;No carry to high byte!
                     ;INC                        ;?????????????? 
-.RTS                STA     HEXVAL+1
-                    RTS
-
+;.RTS                STA     HEXVAL+1
+;                    RTS
+NEGATE          	SEC
+                	LDA     #0
+                	SBC     HEXVAL
+                	STA     HEXVAL
+                	LDA     #0
+                	SBC     HEXVAL+1
+                	STA     HEXVAL+1
+                	RTS
 
 ;------------------------------------------------------------------------
 ; Auto line numbering
@@ -1724,16 +1897,17 @@ SHOWMEM             JSR STRING
             .db $e1,$a5,$e1,$a2,$e1,$a2,$e1,$a5,$e1,$a5,$e1,$a5,$e1,$a5,$e1,$a3
             .db $e1,$a3,$e1,$0d,$0a,$7c,$e3,$a2,$7c,$e2,$7c,$e2,$7c,$e3,$a2,$7c
             .db $e5,$7c,$e5,$7c,$e3,$7c,$e1,$7c,$e2,$a1,$7c,$e2,$a1,$7c,$e1,$4c
-            .db $4f,$57,$45,$52,$e1,$6c,$69,$6d,$69,$74,$3a,$e1,$00
+            .db $4f,$57,$45,$52,$e1,$6c,$69,$6d,$69,$74,$3a,$e1,00
+                    
                     LDA     LOMEM+1             ;Print lomem
                     LDY     LOMEM
                     JSR     WRWORD              
                     JSR     STRING
             
-                    .DB CR,LF
+            .DB CR,LF
             .DB $7c,$a2,$e3,$7c,$a1,$e3,$a1,$7c,$a2,$e3,$7c,$e1,$7c,$e1,$7c,$e1
             .DB $7c,$e2,$7c,$e2,$7c,$e1,$7c,$e1,$7c,$e1,$7c,$e1,$2e,$e1,$7c,$a1
-            .DB $e2,$7c,$e1,$54,$4f,$54,$41,$4c,$e1,$52,$41,$4d,$3a,$e3,$00
+            .DB $e2,$7c,$e1,$54,$4f,$54,$41,$4c,$e1,$52,$41,$4d,$3a,$e3,00
                     
             
                     LDA     HIMEM+1             ;And himem
@@ -1741,10 +1915,10 @@ SHOWMEM             JSR STRING
                     JSR     WRWORD
                     JSR     STRING
                 
-                .DB LF,CR
+            .DB LF,CR
             .DB $7c,$a5,$7c,$e1,$7c,$a1,$7c,$e1,$7c,$a5,$7c,$a1,$7c,$a1,$7c,$a1
             .DB $7c,$a5,$7c,$a1,$7c,$a3,$7c,$a3,$7c,$a3,$7c,$e1,$55,$50,$50,$45
-            .DB $52,$e1,$73,$70,$65,$6e,$74,$3a,$e1,$00
+            .DB $52,$e1,$73,$70,$65,$6e,$74,$3a,$e1,EOS
                 
     
                     JSR     FIND_EOFZ           ;Find end of source file
@@ -1754,7 +1928,7 @@ SHOWMEM             JSR STRING
                     JSR     STRING
                     
             .ASCII  LF,CR 
-            .ASCII "All rights reserved v2.10",CR,LF,EOS
+            .ASCII "All rights reserved v2.30",CR,LF,EOS
 
 .PRWORDCR           ;JSR     WRWORD
                     RTS
@@ -1992,6 +2166,11 @@ CMD_XEC             BEQ     .RUN                ;Nope! Run from last known addr.
                     JMP     WRCRLF              ;print CR LF
 .JSRIND             JMP     (XEC_LAST)          ;GO!
 
+;.RUN                LDX     #0
+;                    JSR     (XEC_LAST,X)    ; Native 65C02 Indirect JSR!
+;                    JMP     WRCRLF
+
+
 
 ;------------------------------------------------------------------------
 ; IN_BLANK  - Get next and see if it's blank
@@ -2213,8 +2392,12 @@ SET_BOF             LDA     LOMEM               ;Set pointer to begin of program
 ; Find end of program memory
 ;------------------------------------------------------------------------
 FIND_EOFZ           JSR     SET_BOF             ;Set pointer to begin of file
-FIND_EOF            LDY     #0                  ;Point to line length
-.LOOP               LDA     (PNTR),Y            ;Get current line's length
+;FIND_EOF            LDY     #0                  ;Point to line length
+;.LOOP               LDA     (PNTR),Y            ;Get current line's length
+
+
+FIND_EOF            		                ;Point to line length
+.LOOP               LDA     (PNTR)            	;Get current line's length
                     BEQ     .EOF                ;EOF found!
                     CLC                         ;Add line length to current pntr
                     ADC     PNTR
@@ -2260,22 +2443,21 @@ FIND_LINE           LDA     0,Y                 ;Get line number to find eg $040
 ;------------------------------------------------------------------------
 ; Set pointer to the next line
 ;------------------------------------------------------------------------
-NEXT_LINE           LDY     #0                  ;Point to line length
-                    LDA     (PNTR),Y            ;Add length to pointer
+NEXT_LINE           LDY     #0                  ;reset point to line length
+                    LDA     (PNTR)            	;Add length to pointer       
                     CLC
                     ADC     PNTR
                     STA     PNTR
                     BCC     .SKIP               ;No carry!
                     INC     PNTR+1
-.SKIP               LDA     (PNTR),Y            ;Set Z if this is EOF
+.SKIP               LDA     (PNTR)            	;Set Z if this is EOF
                     RTS
 
 
 ;------------------------------------------------------------------------
 ; Unpack source line to IN (Without line number)
 ;------------------------------------------------------------------------
-UNPACK_IN           LDY     #0                  ;Get line length
-                    LDA     (PNTR),Y
+UNPACK_IN           LDA     (PNTR)
                     SEC
                     SBC     #3                  ;Subtract length and line-num
                     STA     COUNT
@@ -3097,73 +3279,123 @@ XBRK                JSR     TRACE_DIS           ;show registers
 ;------------------------------------------------------------------------------------------
 ; Tracing
 ;------------------------------------------------------------------------------------------
-CMD_TRACE           PLA                         ;Command Trace code
-                    PLA                         ;Pull caller address off stack      
-                    JSR     GET_EXPRES 
+; =======================================================================
+; COMMAND: TRACE (CMD_TRACE)
+; -----------------------------------------------------------------------
+; Single-steps through 65C02 code. Simulates stack operations (JSR/RTS) 
+; and intercepts conditional branches by executing them in a safe RAM 
+; space (XQT) to see if they are taken.
+; =======================================================================
+CMD_TRACE           PLA                         ;Pull caller address off stack      
+                    PLA                         
+                    JSR     GET_EXPRES          ;Get start address
                     BNE     .CONT
-                    STY     SRCE                ; else continue 
-                    STA     SRCE+1  
-                    JSR     CLS                 ;Clear the screen                   
-.CONT               JSR     TRACE_DIS           ;display one line               
+                    STY     SRCE                ;Store low byte
+                    STA     SRCE+1              ;Store high byte
+                    JSR     CLS                 ;Clear the screen 
+.CONT               JSR     TRACE_DIS           ;Display one line of disassembled code                    
+                    							;INITIALIZE EXECUTION AREA ---
                     LDX     #$08
-XQINIT              LDA     INITBL-1,X          ;Init XEQ AREA with dummy code into Excute area
+XQINIT              LDA     INITBL-1,X          ;Init XEQ AREA
                     STA     XQT,X           
                     DEX
                     BNE     XQINIT              
-                    LDA     (SRCE,X)            ;Get the user code OP- Current source line address
-                    BEQ     XBRK                ;Special If BRK         
-                    LDY     LENG                ;Length from Dissassembler 
-                    CMP     #$80                ;BRA instructions   
-                    BNE     .BRNCH          
-                    LDA     #$F0                ;Fudge BRA into a BEQ
-.BRNCH              CMP     #$20
-                    BEQ     XJSR                ;Handle JSR, RTS, JMP,
+                    
+                    							;IDENTIFY INSTRUCTION ---
+                    LDA     (SRCE)              ;OPTIMIZATION: 65C02 native LDA (zp)
+                    BEQ     XBRK                ;$00 = BRK (Jumps to your existing global XBRK handler)                    
+                    LDY     LENG                ;RESTORED: Length from Disassembler!                    
+                    CMP     #$80                ;$80 = BRA (Branch Always)
+                    BEQ     XBRA                ;Handle unconditional branch directly                    
+.BRNCH              CMP     #$20                ;JSR
+                    BEQ     XJSR                
                     CMP     #$60                ;RTS
                     BEQ     XRTS
-                    CMP     #$4C                ;JMP
+                    CMP     #$4C                ;JMP (Absolute)
                     BEQ     XJMP
-                    CMP     #$6C                ;JMP ()
+                    CMP     #$6C                ;JMP (Indirect)
                     BEQ     XJMPAT
-                    CMP     #$40                ;RTI - this is special
+                    CMP     #$40                ;RTI
                     BEQ     XRTI
-                    AND     #$1F
-                    EOR     #$14
-                    CMP     #$04                ;Copy use code into the XEQ area
-                    BEQ     .XQ2                ;  with trialing NOP command
-.XQ1                LDA     (SRCE),Y            ;Changce relative branch
-.XQ2                STA     XQT,Y               ;  Disp to 4
-                    DEY                         ;  JMP to branch or
-                    BPL     .XQ1                ;  NBRANCK (not branch) from XEQ.
+                    CMP     #$7C                ;JMP (abs, X) - 65C02 Exclusive!
+                    BEQ     XJMPINDX                   
+                    AND     #$1F                ;CONDITIONAL BRANCH INTERCEPT ---
+                    EOR     #$14                ;Forces A to equal $04!
+                    CMP     #$04                ;Is it a conditional branch?
+                    BEQ     .XQ2                ;Yes! Jump to .XQ2 to overwrite offset with $04.
+                    
+.XQ1                LDA     (SRCE),Y            ;Copy normal instruction bytes into XEQ area
+.XQ2                STA     XQT,Y               ;If branch, overwrites offset with $04 to perfectly target XQT+6!
+                    DEY                         
+                    BPL     .XQ1                     
                     JSR     RESTORE             ;Restore user registers 
-                    JMP     XQT                 ;XEQ excute user code in RAM
-XRTI                CLC
-                    PLA                         ;Simulate RTI by expect flags register
-                    STA     SAVP                ; status from stack, then return
-XRTS                PLA                         ;RTS simulate
-                    STA     SRCE                ;  Extract PC from stack 
-                    PLA                         ;  and update PC 
-PCINC2              STA     SRCE+1
-PCINC3              JSR     PCADJ2              ;Update by the length of the instruction
+                    JMP     XQT                 ;EXECUTE user code in RAM!
+												;FLOW CONTROL SIMULATORS
+XBRA                BRA     BRANCH              ;BRA is unconditional. Jump straight to existing relative math!
+
+XRTI                PLA                         ;Simulate RTI: Pull Flags
+                    STA     SAVP                
+                    PLA                         ;Pull PC Low
+                    STA     SRCE
+                    PLA                         ;Pull PC High
+                    STA     SRCE+1
+                    JMP     GETLINE           	;BUG FIX: Do NOT add 1! RTI returns to exact address.
+
+XRTS                PLA                         ;Simulate RTS
+                    STA     SRCE                ;Pull PC Low from stack
+                    PLA                         
+                    STA     SRCE+1              ;Pull PC High from stack
+PCINC3              JSR     PCADJ2              ;Add 1 to the pulled address (RTS specific)
                     STY     SRCE+1
                     CLC
-                    BRA     NEWPCL              ;Always taken
-            
-XJSR                CLC                         ;Handle JSR instructions
-                    JSR     PCADJ2              ;Update the PC
-                    PHY                         ;and push it onto the stak
-                    PHA
+                    BRA     NEWPCL              ;Update PC and exit
+
+XJSR                CLC                         
+                    JSR     PCADJ2              ;Calculate Return Address (Current PC + 2)
+                    PHY                         ;Push Return Address High
+                    PHA                         ;Push Return Address Low
                     LDY     #$02
 XJMP                CLC
-XJMPAT              LDA     (SRCE),Y
-                    TAX                         ;LOAD PC FOR JMP,
-                    DEY                         ;  (JMP) SIMULATE.
-                    LDA     (SRCE),Y
-                    STX     SRCE+1
+                    LDA     (SRCE),Y            ;Get Absolute Target High
+                    TAX                         
+                    DEY                         
+                    LDA     (SRCE),Y            ;Get Absolute Target Low
+                    STX     SRCE+1              ;Update PC
 NEWPCL              STA     SRCE
-                    BCS     XJMP
-RTS_TRACE           ;STZ    ERROR               ;no error - save a bytes
-                    JMP     GETLINE             ;stack may carry JSR/RTS address's
+                    JMP     GETLINE
 
+XJMPAT              LDY     #$02                ;Simulate JMP (Indirect)
+                    LDA     (SRCE),Y
+                    TAX
+                    DEY
+                    LDA     (SRCE),Y            ;A = Vector Low, X = Vector High
+                    STA     TEMP1               ;Store Vector in Zero Page
+                    STX     TEMP1+1
+                    LDA     (TEMP1)             ;BUG FIX: Read actual destination LOW from the Vector
+                    TAX
+                    LDY     #$01
+                    LDA     (TEMP1),Y           ;Read actual destination HIGH from the Vector
+                    STX     SRCE                ;Update PC Low
+                    STA     SRCE+1              ;Update PC High
+RTS_TRACE           JMP     GETLINE             ;Return to OS Prompt
+
+XJMPINDX            LDY     #$01                ;Simulate JMP (abs,X) - Opcode $7C
+                    LDA     (SRCE),Y            ;Get Absolute Vector Low
+                    CLC
+                    ADC     SAVX                ;Add the user's X register!
+                    STA     TEMP1               ;Store in Zero Page
+                    INY
+                    LDA     (SRCE),Y            ;Get Absolute Vector High
+                    ADC     #$00                ;Add carry from X addition
+                    STA     TEMP1+1
+                    
+                    LDA     (TEMP1)             ;Read actual destination LOW
+                    TAX
+                    LDY     #$01
+                    LDA     (TEMP1),Y           ;Read actual destination HIGH
+                    STX     SRCE                ;Update PC Low
+                    STA     SRCE+1              ;Update PC High
+                    JMP     GETLINE           	;Return to monitor!
 
 ;------------------------------------------------------------------------
 ; TRACE - Branch taken calculation
@@ -3202,9 +3434,9 @@ INITBL              NOP                         ;Dummy fill for Tracing
 TRACE_DIS           JSR     CMD_SHOWREG         ;show registers 
                     JSR     DISPLAY_ADDR        ;display SOURCE address (could remove A&Y)                                                              
                     LDA     (SRCE)              ;Get OpCode
-                    JSR     INSTDSP                 
+                    JMP     INSTDSP                 
                     ;JSR    CMD_SHOWREG         ;show registers 
-                    RTS
+                    ;RTS
 
 
 ;------------------------------------------------------------------------------------------  
@@ -3269,17 +3501,17 @@ CMD_SHOWREG         CLD                         ;debugging
                     JSR     WRBIN               ;Flags
                     JSR     WRSPACE 
             
-                    LDY     #00
+					LDX     #$00                ;Start X exactly at 0
 .next_whatch        JSR     WRSPACE
-                    TYA
-                    TAX
-                    INX                         ;jump 16bits
-                    LDA     (WHATCH,X)
-                    JSR     WR2HEX                  
+                    LDA     (WHATCH,X)          ;Reads aligned pointers: +0, +2, +4
+                    JSR     WR2HEX              
+                    PHX                         ;Save X before WRBLNK destroys it!
                     JSR     WRBLNK
-                    INY
-                    CPY     #03
-                    BNE     .next_whatch                                
+                    PLX                         ;Restore X
+                    INX                         ;Advance X by 2 bytes
+                    INX
+                    CPX     #$06                ;3 pointers * 2 bytes = 6
+                    BNE     .next_whatch                              
                     JSR     DRAWLINECR
                                 
                 
@@ -3295,22 +3527,18 @@ CMD_SHOWREG         CLD                         ;debugging
 ;------------------------------------------------------------------------------------------
 ; Reset vector - can be redirect via software if byte A5 is found at USRRST
 ;------------------------------------------------------------------------------------------
-
 RESET_VECTOR        SEI                         ;Hardware reset routine
                     LDA     USRRST              ;Check what vector to use
                     EOR     #$A5                ; user vector or hardware
                     CMP     USRRST+2
                     BNE     COLD_BOOT 
-                    JMP     (USRRST)            ;User Rest Vector
-        
-                
+                    JMP     (USRRST)            ;User Rest Vector      
 COLD_BOOT           LDA     #<RESET_RETURN      ;User user vector stored
                     STA     USRRST
                     EOR     #$A5    
                     STA     USRRST+2
                     LDA     #>RESET_RETURN  
                     STA     USRRST+1
-            
 
 RESET_RETURN        
             .IF MYWYM   
@@ -3319,45 +3547,49 @@ RESET_RETURN
                     STA     IFR             
                     LDA     #%00001111          ;inputs and outputs
                     STA     DIRB
-                    LDA     #%00001111          ;show user that 6502 reseted                
+                    LDA     #%00001001          ;show user that 6502 reseted                
                     STA     REGB                ;Output LEDS light ON
-            .ENDIF
+                    
+          	.ENDIF
     
                     LDX     #$ff                ;normal boot up procedure
                     TXS
-
-;           SED
-;           SEC
-;           LDA     #$20
-;           SBC     #$0F
-;           CMP #$0B
-;           BNE DET6502
-;           JSR STRING
-;       .ASCIS  "detected a 65C02 CPU"
-;DET6502            NOP     
-
                     CLD
                 
-            .IF MYWYM
-                
-                    STZ     ACR                     ;ACIA Init
-                    STZ     PCR                     ;pcr   
-                    LDA     #%11001011              ;IRQ=off,DTR=LOW        
-                    ;LDA    #%00001001              ;IRQ=on
-                    STA     ACMND               
-                    LDA     #%00011111              ;19,200 b/s N81 bits/Bayd
-                    STA     ACTRL                               
-                    STZ     REGB                    ;clear lights aka flash
-                    LDA     ADATA                   ;Clear ACIA
-            .ENDIF              
+	      	.IF MYWYM               
+                   								
+                    ;STZ     ACR                ;ACIA Init (Soft reset)
+                    STZ     PCR                 ;pcr   
+                    STZ     REGB                ;clear lights aka flash 
+					STZ     ASTAT               ;Programmed Reset (Clears 6551 registers) 
+                    LDA     #$09                ;No Parity, IRQ Disabled, DTR Low, RX Enabled 
+                    STA     ACMND               ;Write to Command Register ($AF02) 
+                    LDA     #%00010000          ;1 stop bit, 8 data bits, 57600 baud 
+                    STA     ACTRL               ;Write to Control Register ($AF03) 
+                    LDA     ADATA               ;Clear potential junk from RX buffer     
+                                            
+            .ENDIF            
              
                     LDX     #INITDATA_END-INITDATA  ;FAST Initialise ZP 
 .INITZP             LDA     INITDATA,X
                     STA     USR_OBJHI,X 
                     DEX
                     BPL     .INITZP                         
-                    CLI     ;restore Interrupts
+                    CLI     					;restore Interrupts                    
+                    ;JSR     DETECT_CPU			;check CPU                     
                     JMP     COLD        
+
+;------------------------------------------------------------------------
+; CPU HARDWARE DETECT
+; Prints 'C' if 65C02, or 'N' if NMOS 6502 - works but hey i'll save a couple bytes
+;------------------------------------------------------------------------
+;DETECT_CPU          LDA     #'C'        ; Load 'C' (Assume 65C02 initially)                    
+;                    					; The trap:
+;                    .BYTE   $80, $02    ; 65C02: BRA +2 (Skips the next instruction)
+;                                        ; NMOS:  NOP 2-bytes (Ignores this and falls through)
+;                    LDA     #'N'        ; NMOS will execute this and overwrite A with 'N'!
+;                                        ; 65C02 will completely skip over this line!
+;                    JMP     WRCHAR      ; Print the character and use WRCHAR's RTS to return
 
 
 ;------------------------------------------------------------------------------------------

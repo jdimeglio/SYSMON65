@@ -1,5 +1,5 @@
 ; LIBRARY FILE
-; version 2.20
+; version 2.30
 ; two pass symbolic assembler, dissembler and tracer
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
@@ -73,7 +73,8 @@ CONTINUE            JSR     READ_DATA           ;read rcord length with checksum
                     CMP     (SRCE),y            ;did it actually store          
                     BNE     .WRITEERROR         ;no then error - probably no ram there              
                     LDA     #'#'                ;write fast         
-                    STA     ACIA                ;dont wait on port status                           
+                    ;STA     ACIA                ;dont wait on port status   
+                    JSR     WRCHAR              ;FIX: Uses the ASTAT wait loop                        
                     INY                         ;next address               
                     DEX                         ;next byte to recieve               
                     ;CPX     #$00               ;all bytes recieved?                

@@ -1,5 +1,5 @@
 ; Utility to pack large ASCII text - expecially if has lots of space and hash
-;for VERSION 2.10	
+;for VERSION 2.30	
 
 
 			.OPT proc65C02,swapbin		;Michal Kowaski Simulator
@@ -7,8 +7,8 @@
 			.IO_WND 80,25	
 		
 			
-IMV		='#'				;Indicates immediate mode value
-HEX		='$'				;Indicates a hex value
+IMV			='#'				;Indicates immediate mode value
+HEX			='$'				;Indicates a hex value
 OPEN		='('				;Open bracket for indirect addressing
 CLOSE		=')'				;Close bracket for indirect addressing
 PCREL		='*'				;Indicates PC relative addressing
@@ -16,28 +16,29 @@ LOBYTE		='<'				;Indicates lo-byte of following word
 HIBYTE		='>'				;Indicates hi-byte of following word
 PLUS		='+'				;Plus in simple expressions
 MINUS		='-'				;Minus in simple expressions
-DOT		='.'				;Indicates a local label
+DOT			='.'				;Indicates a local label
 QUOTE		=$27				;delimits a string
 COMMA		=','				
 CMNT		=';'				;indicates a full line comment
 PROMPT		='.'				;The assembler prompt character
 DASH		='-'				;Dash for crued graphics
-EOL		=$00				;End of line marker
-EOS		=$00				;End of string marker
+EOL			=$00				;End of line marker
+EOS			=$00				;End of string marker
 EOFLD		=$01				;End of field in tokenised source line
 BLANK		=$02				;used to mark a blank line
 PRGEND		=$FE				;used to flag end of program parsing
 FAIL		=$FF				;used to flag failure in various searches
-CR		=$0D				;CR character
-ESC		=$1B				;ESC character
+CR			=$0D				;CR character
+ESC			=$1B				;ESC character
 BELL		=$07				;BELL should be $07 but $20 for testing 
-BS		=$08				;Back space key
-TAB		=$09				;TAB character
-LF		=$0a				;Line feed
-SP		=$20				;Space	
+BS			=$08				;Back space key
+TAB			=$09				;TAB character
+LF			=$0a				;Line feed
+SP			=$20				;Space	
 
 
 ;suspectiable to change as ROM's are generated. 
+;CHECK Them before running
 
 STRING		=	$F5F0	
 WRCSI 		= 	$F651
@@ -60,24 +61,24 @@ NNONSPC		=	$E565
 ;complier flags 	
 BRKAS2		= 0					;Add a second BRK byte
 MYWYM		= 1					;has MYWYM Board settings/Chips
-LCD_ROUTINES	= 0					;Compile with LCD 16x2 lines 	
+LCD_ROUTINES	= 0				;Compile with LCD 16x2 lines 	
 SYMON		= 0					;used for SYMON to define CIA and VIA
 	
 ;special memory locations	
-USERKEYDEF	= $f6					;User defined @keys
-CMD_CHR         = $C5  			             	;First character of command
-ERROR           = $C6   
-IN		= $0E
+USERKEYDEF	= $f6				;User defined @keys
+CMD_CHR     = $C5  			    ;First character of command
+ERROR       = $C6   
+IN			= $0E
 
 		;*= $40
 
 ; General purpose registers
 
-NEG_FLAG         = $40               			;Negative flag (if <> 0)
-COUNT            = $41                  		;GP counter
-DELIM            = $42              			;String/ASCII delimiter
-HEXVAL           = $43               			;16-bit value of expression
-LEAD0            = $45               			;Leading 0 flag
+NEG_FLAG         = $40               	;Negative flag (if <> 0)
+COUNT            = $41                  ;GP counter
+DELIM            = $42              	;String/ASCII delimiter
+HEXVAL           = $43               	;16-bit value of expression
+LEAD0            = $45               	;Leading 0 flag
 CHAR             = $46              	;Character compilation register
 MULDIV           = $48               	;Multiply/divide temp
 EXP_SAVE         = $4a               	;Expression save value
@@ -85,7 +86,7 @@ DEC_SAVE         = $4c               	;Decimal convert save value
 SAVE_Y           = $4d               	;Save Y pointer
 LENG             = $4f              	;Length of block move
 SRCE             = $51               	;Source for block move
-DEST             = $53			;Destination for block move
+DEST             = $53					;Destination for block move
 SAVE_X           = $55               	;Save X pointer
 
 
@@ -97,29 +98,29 @@ SAVE_X           = $55               	;Save X pointer
 	
 	.IF	SYMON
 	
-VIA     	= $8000				;My board settings
+VIA     	= $8000						;My board settings
 ACIA    	= $8800	
 	.ELSE
-VIA     	= $4000				;My board settings
+VIA     	= $4000						;My board settings
 ACIA    	= $6000				
 		
 	.ENDIF
 	
 		
-ADATA		= ACIA				;ACIA 6551 definations
+ADATA		= ACIA						;ACIA 6551 definations
 ASTAT		= ADATA +1
 ACMND		= ADATA +2
 ACTRL		= ADATA +3		
-REGB    	= VIA				;VIA 6522 definations
+REGB    	= VIA						;VIA 6522 definations
 REGA		= REGB +1
 DIRB		= REGB +2
 DIRA		= REGB +3
 TICL		= REGB +4
 TICH		= REGB +5
-ACR		= REGB +$B
-PCR		= REGB +$C
-IFR		= REGB +$D
-IER		= REGB +$E
+ACR			= REGB +$B
+PCR			= REGB +$C
+IFR			= REGB +$D
+IER			= REGB +$E
 	.ELSE
 	
 
@@ -131,14 +132,14 @@ ACIA   	 	= io_area
 io_cls	 	= io_area + 0 			;writing to this clears the output window
 io_putc 	= io_area + 1 			;a "glass teletype" output window. BS, CR and LF are actioned
 io_putr 	= io_area + 2 			;raw output, bytes are output as their
-						;characters and not actioned.
+									;characters and not actioned.
 io_puth 	= io_area + 3 			;hex output, bytes are output as their hex code
 io_getc 	= io_area + 4 			;SCAN_ESCing character get, will wait for input
 io_posx 	= io_area + 5 			;set cursor x position by writing here
 io_posy 	= io_area + 6 			;set cursor y position by writing here        
 	
-KBD             = io_getc       		;Keyboard input register
-KBDCR           = io_getc 	        	;Keyboard control register
+KBD             = io_getc       	;Keyboard input register
+KBDCR           = io_getc 	       	;Keyboard control register
 
 		
 	.ENDIF
@@ -153,37 +154,37 @@ KBDCR           = io_getc 	        	;Keyboard control register
 ;---------------------------------------------------------------------
 			*= $1000
 START		
-			lda	#<trace	;klocation for text area to pack
-			sta	SRCE
-			lda	#>trace
-			STA	SRCE +1
+					lda		#<trace				;klocation for text area to pack
+					sta		SRCE
+					lda		#>trace
+					STA		SRCE +1
 			
 			
-			LDA	#00
-			STA	DEST
-			LDA	#$20
-			STA	DEST+1		;$2000 location to store	
+					LDA		#00
+					STA		DEST
+					LDA		#$20
+					STA		DEST+1				;$2000 location to store	
 
 
 
 ;---------------------------------------------------------------------
-PACK1			LDY	#0			
-.LOOP           	LDA	(SRCE),y						
-			BEQ	.eol		;ends with a ZERO
+PACK1				LDY		#0			
+.LOOP       		LDA		(SRCE),y						
+					BEQ		.eol				;ends with a ZERO
 						
 
 
-			CMP	#SP
-			beq	.pack
-			CMP     #DASH 
-			BEQ	.pack	
-			CMP	#'_'		
-			BEQ	.pack
+					CMP		#SP
+					beq		.pack
+					CMP     #DASH 
+					BEQ		.pack	
+					CMP		#'_'		
+					BEQ		.pack
 
-			JSR	BUMPSOURCE		
+					JSR		BUMPSOURCE		
 			
 .WRITE          	STA     (DEST),Y      	;Save normal character
-	                JSR	BUMPDEST
+	                JSR		BUMPDEST
 	                
 	                BRA     .LOOP          	;Always taken!
 
@@ -191,7 +192,7 @@ PACK1			LDY	#0
                		LDA     #1              ;Init repetition counter
                 	STA     COUNT
 
-.PCKLOOP        	JSR	BUMPSOURCE     	;Count number of same characters
+.PCKLOOP        	JSR		BUMPSOURCE     	;Count number of same characters
                 	LDA     (SRCE),y
 	                CMP     DELIM
 	                BNE     .PCKEXIT        ;It's not the same anymore!
@@ -199,24 +200,24 @@ PACK1			LDY	#0
 	                LDA     COUNT           ;Don't allow it to exceed 63
 	                CMP     #31
 	                BCC     .PCKLOOP   	;Still OK!
-			NOP
+					NOP
 			
-	                JSR	BUMPSOURCE      ;Compensate for normal exit
+	                JSR		BUMPSOURCE      ;Compensate for normal exit
 .PCKEXIT        	LDA     DELIM           ;Was it space or dash?
 	                CMP     #' '            ;  (Makes A=0 if it is space                
 	                BEQ     .SPACE          ;It was space!
-	                CMP	#DASH
-	                BEQ	.DASH
+	                CMP		#DASH
+	                BEQ		.DASH
 	                LDA     #%10100000      ;Set _ flag
-			BRA	.ADDCOUNT
+					BRA		.ADDCOUNT
 			
-.DASH			LDA	#%10100000	;Set dash flag
-			BRA	.ADDCOUNT
+.DASH				LDA		#%10100000	;Set dash flag
+					BRA		.ADDCOUNT
 
-.SPACE          	LDA	#%11100000
-.ADDCOUNT		ORA     COUNT          	;Combine with counter			
+.SPACE          	LDA		#%11100000
+.ADDCOUNT			ORA     COUNT          	;Combine with counter			
 	                BRA     .WRITE          				
-.eol			RTS
+.eol				RTS
 
 
 
@@ -227,34 +228,34 @@ PACK1			LDY	#0
 
 ;-----------------------------------------------------------------------------		
 		
-BUMPSOURCE		INC	SRCE	
-			BNE	.skipbump	
-			INC	SRCE+1				
-.skipbump		RTS	
+BUMPSOURCE			INC		SRCE	
+					BNE		.skipbump	
+					INC		SRCE+1				
+.skipbump			RTS	
 
 ;-----------------------------------------------------------------------------				
 
-BUMPDEST		INC	DEST							
-			BNE	.skipbump	
-			INC	DEST+1				
-.skipbump		RTS			
+BUMPDEST			INC		DEST							
+					BNE		.skipbump	
+					INC		DEST+1				
+.skipbump			RTS			
 		
 ;-----------------------------------------------------------------------------			
 		
 trace		
-	.ASCII " _______ ______ _______ ______ _______                   ",CR,LF
+		.ASCII " _______ ______ _______ ______ _______                   ",CR,LF
 		.ASCII "|_     _|   __ |   _   |      |    ___|  AC=",EOS
 
 	
 ;	.ASCII " _____ __ __ _____ _____ _____ _____ ___ ___ ",CR,LF
 ;	.ASCII "|   __|  |  |   __|     |     |   | |  _|  _| LOWER limit: ",EOS
 ;	.ASCII "|__   |_   _|__   | | | |  |  | | | | . |_  | TOTAL RAM:   ",EOS
-;       .ASCII "|_____| |_| |_____|_|_|_|_____|_|___|___|___| UPPER spent: ",EOS 
+;   .ASCII "|_____| |_| |_____|_|_|_|_____|_|___|___|___| UPPER spent: ",EOS 
 
 		
 	
 
-help		.ASCII CR
+help	.ASCII CR
 		.ASCII "  _______  _______  _____    ______  __ ",CR,LF 		                         
 		.ASCII " |   |   ||    ___||     |  |   __ \|  |",CR,LF 		 	
 		.ASCII " |       ||    ___||     |_ |    __/|__|           @  User defined command",CR,LF                          

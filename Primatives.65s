@@ -1,5 +1,5 @@
 ; LIBRARY FILE - PRIMATIVES 
-; version 2.20
+; version 2.30
 ; two pass symbolic assembler, dissembler and tracer
 ; REGB bits 0-3 are connected to LED's
 ; tested in Michael Kowalski 6502 Simulator - using 65C02 Code 
@@ -12,51 +12,54 @@
 ;prints a string ending with EOS - checkign for packed strings
 ;looks for the string after teh JSR statement
 ;------------------------------------------------------------------------           
-STRING              PHP                         ;print stringz to screen
-                    PHA             
-                    PHX             
-                    PHY             
-                    LDA     SRCE                ;Save SRCE  
-                    PHA             
-                    LDA     SRCE+1              
-                    PHA             
-                    TSX             
-                    LDA     $0107,x             ;get return address-1   
-                    STA     SRCE                ;from the stack
-                    LDA     $0108,x
-                    STA     SRCE+1                              
-.NEXTCHAR           INC     SRCE
-                    BNE     .SKIPBUMP           ;edge of page 
-                    INC     SRCE+1  
-.SKIPBUMP           LDY     #$01                ;trick to save some bytes
-                    LDA     (SRCE)          
-                    BEQ     .ADJUST_RETURN      ;EOS Marker
-                    BPL     .NOTPACK            ;is it packed?          
-                    JSR     UNPACK_DECODE       ;return character AC and count YR           
-.NOTPACK            JSR     WRCHAR              ;write character
-                    DEY
-                    BNE     .NOTPACK
-                    BRA     .NEXTCHAR                           
-.ADJUST_RETURN      LDA     SRCE
-                    STA     $0107,x             
-                    LDA     SRCE+1              
-                    STA     $0108,x             
-                    PLA                         ;Restore SRCE variable
-                    STA     SRCE+1                  
-                    PLA             
-                    STA     SRCE
-                    PLY             
-                    PLX             
-                    PLA         
-                    PLP             
-                    RTS                 
+;--------------------------------------------------------------------
+; Ultra-Optimized 65C02 STRING Routine
+;--------------------------------------------------------------------
+STRING              PHP
+                    PHA
+                    PHX
+                    PHY
 
+                    TSX
+                    LDA     $0105,x         ; Fetch Return Address Low
+                    STA     STR_PTR
+                    LDA     $0106,x         ; Fetch Return Address High
+                    STA     STR_PTR+1
+
+.NEXTCHAR           INC     STR_PTR
+                    BNE     .FETCH
+                    INC     STR_PTR+1
+
+.FETCH              LDA     (STR_PTR)       ; 
+                    BEQ     .ADJUST_RETURN  ; $00 = End of String                    
+                    BMI     .PACKED_TOKEN   ; If Bit 7 is 1, it's compressed data               
+                   
+                    JSR     WRCHAR          ; Print it once
+                    BRA     .NEXTCHAR       ; Immediately grab the next byte!
+                    
+.PACKED_TOKEN       ; --- SLOW PATH: RLE TEXT ---
+                    JSR     UNPACK_DECODE   ; Sets A to char, Y to repeat count
+.PRINT_LOOP         JSR     WRCHAR
+                    DEY
+                    BNE     .PRINT_LOOP
+                    BRA     .NEXTCHAR
+                    
+.ADJUST_RETURN      LDA     STR_PTR
+                    STA     $0105,x         ; Overwrite stack return address
+                    LDA     STR_PTR+1
+                    STA     $0106,x
+                    
+                    PLY
+                    PLX
+                    PLA
+                    PLP
+                    RTS
 
 ;------------------------------------------------------------------------
 ; ANSI GOTO x & y 
 ;------------------------------------------------------------------------
 GOTOXY              
-        .IF MYWYM
+        	.IF MYWYM
                     PHA                         ;goto [ <X> ; <Y> H
                     LDA     #ESC                ;Escape codes   
                     JSR     WRCHAR              
@@ -90,8 +93,8 @@ WRCSI               PHA                             ;save value
                     TXA             
                     JSR     WRCHAR                  ;write in decimal 
                     PLA             
-                    JSR     WRCHAR                  ;write ANSI Mode                                    
-                    RTS    
+                    BRA     WRCHAR                  ;write ANSI Mode                                    
+                        
                     
 ;------------------------------------------------------------------------
 ; ANSI - Clear Screen; ;.BYTE   ESC,"[2J",EOS                       
@@ -114,8 +117,7 @@ CLS
 HOME  
             .IF MYWYM
                     JSR     STRING              
-                    .ASCII  ESC
-                    .ASCIS  "[1;1H"
+                    .ASCII  ESC,"[1;1H",EOS
                     RTS                     
             .ELSE
                     LDX     #00
@@ -126,15 +128,14 @@ HOME
 ; ANSI -  Save Cursor Position
 ;------------------------------------------------------------------------
 SAVECUR             JSR     STRING 
-                .ASCII  ESC
-                .ASCIS  "[s"                                            
+                	.ASCII  ESC,"[s",EOS                                            
                     RTS                     
 
 ;------------------------------------------------------------------------
 ; ANSI -  Restore Cursor Position 
 ;------------------------------------------------------------------------
 RESTCUR             JSR     STRING          
-                .ASCIS  ESC,"[u"                                            
+                	.ASCII  ESC,"[u",EOS                                         
                     RTS                     
                                     
 ;------------------------------------------------------------------------
@@ -147,12 +148,12 @@ WRDOT               LDA     #'.'                ;Print a dot
 ; Check Tabs
 ;------------------------------------------------------------------------
 TABS3
-        .IF MYWYM
+        	.IF MYWYM
                     LDA     #'C'
                     LDX     #20
                     JSR     WRCSI
             
-        .ELSE
+        	.ELSE
                     PHA
                     LDA     io_posx
                     LDA     #20
@@ -160,7 +161,7 @@ TABS3
                     ;ADC    #06
                     STA     io_posx
                     PLA
-        .ENDIF  
+        	.ENDIF  
                     RTS 
                         
 ;------------------------------------------------------------------------
@@ -181,32 +182,28 @@ WRLF                LDA     #LF                 ;fall through to WRCHAR
 ;WRCHAR Out charater to the screen
 ;  Low level
 ;------------------------------------------------------------------------
-WRCHAR      
-        .IF LCD_ROUTINES
-        
+WRCHAR
+        	.IF LCD_ROUTINES
                     BBR     #01, WR2LCD,.SERIAL 
                     JMP     LCD_WRCHAR
 .SERIAL             
-        .ENDIF          
+        	.ENDIF   
 
-        .IF MYWYM
-        
-        
-                    PHP                         ;save flags         
+        	.IF MYWYM
+					PHP                         ;save flags         
                     PHA             
-.WAITTX             LDA     #%00010000
-                    BIT     ASTAT               
-                    BEQ     .WAITTX             
+                    LDA     #%00010000          ;Load mask
+.WAITTX             BIT     ASTAT               ;Test the hardware
+                    BEQ     .WAITTX             ;Loop if not ready
                     PLA             
-                    STA     ADATA                               
+                    STA     ADATA      
                     PLP             
                     RTS
-        
-        .ELSE
+                                        
+        	.ELSE
                     STA     io_putc             ;Else use simulator
                     RTS
-        .ENDIF  
-
+        	.ENDIF
 
 ;------------------------------------------------------------------------
 ;Print Blank Lines & print N Blank lines 
@@ -225,7 +222,7 @@ DRAWLINECR          JSR     WRCRLF
 DRAWLINE            LDA     #DASH
                     LDX     #78                 ;columns on the screen 80-2
                     JSR     REPWRCHAR 
-                    JMP     WRCRLF
+                    BRA     WRCRLF
                     
 REPWRCHAR           JSR     WRCHAR
                     DEX
@@ -233,7 +230,7 @@ REPWRCHAR           JSR     WRCHAR
                     RTS
 
 ;------------------------------------------------------------------------
-;convert binary into a ASCII characters 
+;convert binary into a ASCII characters - assume cpu is in binary
 ;write to screen eg xx
 ;------------------------------------------------------------------------
 WR2HEX              PHA         
@@ -243,7 +240,7 @@ WR2HEX              PHA
                     LSR         
                     JSR     WR1HEX          
                     PLA         
-WR1HEX              CLD                         ;write 1 character HEX eg x 
+WR1HEX              ;CLD                         ;write 1 character HEX eg x 
                     AND     #$0f            
                     CMP     #$0a            
                     BCC     .z09                        
@@ -269,10 +266,11 @@ WRWORDAY            JSR     WR2HEX              ;Print MSB
 ;------------------------------------------------------------------------
 SCAN_ESC    
             .IF MYWYM       
-                    LDA     #%00001000
-                    AND     ACIA+1              ; ACIA Status register          
-                    BEQ     .NOTHING            ; Anything in the buffer
+                    LDA     #%00001000          ; 6551 RX Full is Bit 3
+                    AND     ASTAT               ; ACIA Status register          
+                    BEQ     .NOTHING            
                     JSR     READACIA    
+          
 .NOTHING            CMP     #ESC
                     RTS     
         
@@ -282,28 +280,26 @@ SCAN_ESC
                     RTS
             .ENDIF
 
-
 ;------------------------------------------------------------------------
 ; Wait for keypressed
 ;  Low level
 ;------------------------------------------------------------------------
 RDCHAR
-        .IF MYWYM 
-                ;CLC                        ;Read ASCII byte into AC
-.WAITRX             LDA     ACIA+1 
-                    AND     #%00001000          ;ACIA Status register           
+        	.IF MYWYM 
+					LDA     #%00001000          ;Load mask ONCE
+.WAITRX             BIT     ASTAT               ;(Changed from AND to BIT so A isn't destroyed)
                     BEQ     .WAITRX         
-READACIA            LDA     ACIA                
+READACIA            LDA     ACIA
                     PHA             
-                    LDA     ACIA+1              ;clear status register              
+                    LDA     ASTAT               ;clear 6551 status register              
                     PLA         
                     RTS         
-        .ELSE   
+
+        	.ELSE   
                     LDA     KBDCR               ;Else use simulator         
                     BEQ     RDCHAR      
                     RTS 
-        .ENDIF
-
+        	.ENDIF
 
 ;------------------------------------------------------------------------
 ;Read 1 character and convert it to HEX 
@@ -328,16 +324,35 @@ RD2HEX              JSR     RD1HEX
 ;------------------------------------------------------------------------
 ;Convert AC in HEX out BIN
 ;------------------------------------------------------------------------
-HEX2BIN             EOR     #'0'                ;Ignore ASCII part for decimals             
-                    CMP     #9+1    
-                    BCC     .okhex              ;It was a decimal digit!
-                    ADC     #$88                ;Map letters A - F to $FA-FF
-                    CMP     #$fa
-                    BCC     .invalid            ;No hex digit anymore!
-                    AND     #$0F            
-.okhex              RTS
-.invalid            LDA     #FAIL
-                    RTS                         
+;HEX2BIN             EOR     #'0'                ;Ignore ASCII part for decimals             
+;                    CMP     #9+1    
+;                    BCC     .okhex              ;It was a decimal digit!
+;                    ADC     #$88                ;Map letters A - F to $FA-FF
+;                    CMP     #$fa
+;                    BCC     .invalid            ;No hex digit anymore!
+ ;                   AND     #$0F            
+;.okhex              RTS
+;.invalid            LDA     #FAIL
+;                    RTS                         
+
+;------------------------------------------------------------------------
+; HEX2BIN (Extreme Size Optimization: 20 Bytes)
+; Expects: ASCII in A
+; Returns: Binary 0-15 in A, or FAIL if invalid.
+;------------------------------------------------------------------------
+HEX2BIN             EOR     #'0'        ; Maps '0'-'9' to 0-9. Maps A-F to $71-$76, a-f to $51-$56
+                    CMP     #10         ; If A < 10, Carry = 0. If A >= 10, Carry = 1.
+                    BCC     .DONE       ; 0-9 finished! Branches with exact binary value.
+                    
+                    ORA     #$20        ; Magic: Folds both $71-$76 (A-F) and $51-$56 (a-f) into $71-$76!
+                    SBC     #$71        ; C=1 from CMP, so no borrow. $71-$76 safely becomes 0-5.
+                    CMP     #6          ; Is it > 5? (Sets C=0 if it is valid 0-5)
+                    BCS     .INVALID    ; If it wasn't a valid hex letter, reject it.
+                    
+                    ADC     #10         ; C=0 from CMP, so it perfectly adds exactly 10.
+.DONE               RTS
+.INVALID            LDA     #FAIL
+                    RTS
 
 
 ;--------------------------------------------------------------
