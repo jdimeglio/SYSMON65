@@ -3562,7 +3562,7 @@ RESET_RETURN
                     STZ     PCR                 ;pcr   
                     STZ     REGB                ;clear lights aka flash 
 					STZ     ASTAT               ;Programmed Reset (Clears 6551 registers) 
-                    LDA     #$09                ;No Parity, IRQ Disabled, DTR Low, RX Enabled 
+                    LDA     #$0B                ;No Parity, IRQ Disabled, DTR Low, RX Enabled 
                     STA     ACMND               ;Write to Command Register ($AF02) 
                     LDA     #%00010000          ;1 stop bit, 8 data bits, 57600 baud 
                     STA     ACTRL               ;Write to Control Register ($AF03) 
