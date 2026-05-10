@@ -187,8 +187,8 @@ KEYDEF              LDY     #0                  ;Find command in table
                     .BYTE       'C'             ;Copy command
                     .BYTE       'D'             ;Dissassembler
                     .BYTE       'E'             ;Erase command
-                    .BYTE       'F'             ;Fill Command - future
-                    .BYTE       'G'             ;GO command - future
+                    .BYTE       'F'             ;Fill Command
+                    .BYTE       'G'             ;GO command
                     .BYTE       'H'             ;Hunt Command - future
                     .BYTE       '?'             ;Help command
                     .BYTE       'I'             ;ASCII Dump 
@@ -1632,7 +1632,7 @@ CMD_COP             STY     UNDEF               ;Clear undefined label flag
 .RTS                RTS
 
 .MIS                LDA     #ERR_MIS            ;Exit with missing error
-                    .DB $2C                     ;save a byte
+                    .DB 	$2C                 ;save a byte
                                                 ;Always taken
 .UNDEF              LDA     #ERR_DEF            ;Exit with undefined label
 .SKIP               STA     ERROR
@@ -1647,7 +1647,6 @@ _ERROR              PLA                         ;Pull return address from stack
 
 CMD_ERASE           JSR     BEG_END             ;Get begin and end line parameters
                     BCS     DELETE              ;Parameters given! Do delete
-
 ERROR_MISSING       LDA     #ERR_MIS            ;Exit with missing parameter
                     STA     ERROR
 ERASE_RTS           RTS
@@ -1656,9 +1655,9 @@ ERASE_RTS           RTS
 ;------------------------------------------------------------------------
 ;Fill F start range value
 ;------------------------------------------------------------------------ 
-CMD_FILL            JSR     GET_VAL         ;Fill Memory Command 
+CMD_FILL            JSR     GET_VAL         	;Fill Memory Command 
                     ;BCS    ERROR_MISSING
-.OK                 STY     HIMEM           ;Get start address
+.OK                 STY     HIMEM           	;Get start address
                     STA     HIMEM+1  
                     INX
                     JSR     GET_VAL             ;Get RANGE 
@@ -2166,11 +2165,6 @@ CMD_XEC             BEQ     .RUN                ;Nope! Run from last known addr.
                     JMP     WRCRLF              ;print CR LF
 .JSRIND             JMP     (XEC_LAST)          ;GO!
 
-;.RUN                LDX     #0
-;                    JSR     (XEC_LAST,X)    ; Native 65C02 Indirect JSR!
-;                    JMP     WRCRLF
-
-
 
 ;------------------------------------------------------------------------
 ; IN_BLANK  - Get next and see if it's blank
@@ -2256,7 +2250,7 @@ ADDLINE             JSR     GET_VAL             ;ADDLINE - Add line to the progr
                 .DB $2C                         ;Skip two bytes trcick          
                     ;BRA    .ADDCOUNT           
 .DASH_FLAG           LDA     #%11000000         ;Set dash flag
-                .DB $2C             ;Skip two bytes
+                .DB $2C             			;Skip two bytes
                     ;BRA    .ADDCOUNT
 .SPACE_FLAG         LDA     #%11100000          ;Set space flag         
 .ADDCOUNT           ORA     COUNT               ;Combine with counter           
@@ -2392,11 +2386,11 @@ SET_BOF             LDA     LOMEM               ;Set pointer to begin of program
 ; Find end of program memory
 ;------------------------------------------------------------------------
 FIND_EOFZ           JSR     SET_BOF             ;Set pointer to begin of file
-;FIND_EOF            LDY     #0                  ;Point to line length
-;.LOOP               LDA     (PNTR),Y            ;Get current line's length
+;FIND_EOF            LDY     #0                 ;Point to line length
+;.LOOP               LDA     (PNTR),Y           ;Get current line's length
 
 
-FIND_EOF            		                ;Point to line length
+FIND_EOF            		                	;Point to line length
 .LOOP               LDA     (PNTR)            	;Get current line's length
                     BEQ     .EOF                ;EOF found!
                     CLC                         ;Add line length to current pntr
@@ -2488,7 +2482,7 @@ UNPACK_IN           LDA     (PNTR)
 
 ;------------------------------------------------------------------------
 ; Decode unpack ; returns y = count A= character Z=1 if EOL
-;   100 count future 
+;   100 count packed marker
 ;   110 count -
 ;   101 count _
 ;   111 count SPACE
@@ -2900,7 +2894,6 @@ EXP_SYM             CLC                         ;See if there's enough room to
                     BCC     MEM_FULL            ;Memory full!
                     RTS
 
-
 ;------------------------------------------------------------------------
 ; Find label in symbol table
 ; Upon exit:
@@ -3071,14 +3064,12 @@ FIND_GLOBAL_SRCH    STX     SAVE_Y              ;Save start of label name
 
 .EXIT               LDX     DELIM               ;Label found or at end of symtab
                     LDA     IN,X                ;Restore end of label marker
-                    ;ORA     #%10000000         ;only used for apple
                     AND     #%01111111
                     STA     IN,X
                     LDY     #0
                     LDA     (DEST),Y            ;A will be 0 if label not found
                     BEQ     .RTS                ;Label not found!
                     EOR     #%10000000          ;Save label's assigned flag
-                    ;AND     #%10000000         ;  (inverted!)
                     AND     PASS                ;Remains 0 if pass 1
                     STA     LABEL_FLAG
                     INY
@@ -3250,7 +3241,7 @@ IRQ_RETURN          ;JSR    SAVE
 IRQ_VECTOR          PHA                         ;IRQ hardware interrupt
                     PHX
                     TSX
-                    LDA     $0103,x             ;check if caused by a 
+                    LDA     $0103,x             ;check if caused by a BRK
                     PLX                         ;done with X so restore it
                     BIT     #$10                ;BRK instruction            
                     BNE     GOBRK               ;yes            
@@ -3279,13 +3270,10 @@ XBRK                JSR     TRACE_DIS           ;show registers
 ;------------------------------------------------------------------------------------------
 ; Tracing
 ;------------------------------------------------------------------------------------------
-; =======================================================================
-; COMMAND: TRACE (CMD_TRACE)
-; -----------------------------------------------------------------------
 ; Single-steps through 65C02 code. Simulates stack operations (JSR/RTS) 
 ; and intercepts conditional branches by executing them in a safe RAM 
 ; space (XQT) to see if they are taken.
-; =======================================================================
+;------------------------------------------------------------------------------------------
 CMD_TRACE           PLA                         ;Pull caller address off stack      
                     PLA                         
                     JSR     GET_EXPRES          ;Get start address
@@ -3529,7 +3517,7 @@ CMD_SHOWREG         CLD                         ;debugging
 ;------------------------------------------------------------------------------------------
 RESET_VECTOR        SEI                         ;Hardware reset routine
                     LDA     USRRST              ;Check what vector to use
-                    EOR     #$A5                ; user vector or hardware
+                    EOR     #$A5                ;user vector or hardware
                     CMP     USRRST+2
                     BNE     COLD_BOOT 
                     JMP     (USRRST)            ;User Rest Vector      
@@ -3753,3 +3741,5 @@ SYM_TABLE_ROM       .ASCIS  "R"
                 .WORD   NMI_VECTOR                  ; NMI_VECTOR
                 .WORD   RESET_VECTOR                ; REST VECTOR
                 .WORD   IRQ_VECTOR                  ; IRQ_VECTOR            
+
+;thank you
