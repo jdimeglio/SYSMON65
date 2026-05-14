@@ -23,7 +23,7 @@ While heavily optimized utilizing specific 65C02 instructions (like `phx`, `plx`
 SYSMON65 was built for and tested on real hardware running an N65C02 processor. 
 * **CPU:** WDC 65C02 Microprocessor.
 * **UART:** 6551 ACIA for serial communications (Features a bug-free implementation that bypasses the infamous Xmit bug).
-* **Terminal:** Designed for ANSI screen codes over Serial at **19200 baud (N81)**.
+* **Terminal:** Designed for ANSI screen codes over Serial at **57600 baud (N81)**.
 * **I/O:** 6522 VIA for input/output ports.
 * **Memory:** 27C256 ROM and standard RAM chips.
 * **Display:** Includes an integrated library to drive a 16x2 HD44780-compatible LCD Module.
